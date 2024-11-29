@@ -1,0 +1,19 @@
+with-expecter: True
+dir: ./
+mockname: "Mock{{.InterfaceName}}"
+filename: "mock_{{.InterfaceName}}_test.go"
+outpkg: "cluster"
+packages:
+  github.com/godepo/elephant/internal/cluster:
+    config:
+      all: False
+    interfaces:
+      DB:
+        config:
+      Pool:
+        config:
+  github.com/jackc/pgx/v5:
+    config:
+      all: False
+      include-regex: "Rows|Tx|Row"
+      exclude-regex: "CollectableRow|RowToFunc|RowScanner"
