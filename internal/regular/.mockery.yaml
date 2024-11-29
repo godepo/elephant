@@ -1,0 +1,18 @@
+with-expecter: True
+dir: ./
+mockname: "Mock{{.InterfaceName}}"
+filename: "mock_{{.InterfaceName}}_test.go"
+outpkg: "regular"
+packages:
+  github.com/godepo/elephant/internal/regular:
+    config:
+      all: False
+    interfaces:
+      DB:
+        config:
+      Pool:
+        config:
+  github.com/jackc/pgx/v5:
+    config:
+      all: False
+      include-regex: "Rows|Tx"

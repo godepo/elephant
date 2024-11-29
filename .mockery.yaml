@@ -1,0 +1,10 @@
+with-expecter: True
+dir: ./
+mockname: "Mock{{.InterfaceName}}"
+filename: "mock_{{.InterfaceName}}_test.go"
+outpkg: "elephant"
+packages:
+  github.com/jackc/pgx/v5:
+    config:
+      all: False
+      include-regex: "Tx"
