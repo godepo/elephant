@@ -3,6 +3,7 @@
 [![Go Report Card](https://goreportcard.com/badge/godepo/elephant)](https://goreportcard.com/report/godepo/elephant)
 [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/{owner}/{repo}/badge)](https://scorecard.dev/viewer/?uri=github.com/godepo/elephant)
 [![License](https://img.shields.io/badge/License-MIT%202.0-blue.svg)](https://github.com/godepo/elephant/blob/main/LICENSE)
+[![OpenSSF Best Practices](https://www.bestpractices.dev/projects/9752/badge)](https://www.bestpractices.dev/projects/9752)
 
 Lightweight toolkit for using transactional queries through pgx driver and write clean and compact code. 
 
