@@ -14,6 +14,8 @@ const (
 	optCanWrite
 	optTxOptions
 	optTxPassMatcher
+	optShardID
+	optShardingKey
 )
 
 type OptionContext func(ctx context.Context) context.Context
@@ -71,5 +73,27 @@ func WithFnTxPassMatcher(fn TxPassMatcher) OptionContext {
 
 func TxPassMatcherFrom(ctx context.Context) (TxPassMatcher, bool) {
 	res, ok := ctx.Value(optTxPassMatcher).(TxPassMatcher)
+	return res, ok
+}
+
+func WithShardID(shardID uint) OptionContext {
+	return func(ctx context.Context) context.Context {
+		return context.WithValue(ctx, optShardID, shardID)
+	}
+}
+
+func ShardIDFrom(ctx context.Context) (uint, bool) {
+	res, ok := ctx.Value(optShardID).(uint)
+	return res, ok
+}
+
+func WithShardingKey(shardingKey string) OptionContext {
+	return func(ctx context.Context) context.Context {
+		return context.WithValue(ctx, optShardingKey, shardingKey)
+	}
+}
+
+func ShardingKeyFrom(ctx context.Context) (string, bool) {
+	res, ok := ctx.Value(optShardingKey).(string)
 	return res, ok
 }
