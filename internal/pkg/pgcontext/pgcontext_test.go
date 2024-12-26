@@ -7,6 +7,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/jaswdr/faker/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -77,5 +78,36 @@ func TestTxPassMatcherFrom(t *testing.T) {
 		require.True(t, ok)
 		assert.True(t, fn(ctx, errors.New(uuid.NewString())))
 
+	})
+}
+
+func TestShardIDFrom(t *testing.T) {
+	t.Run("should be able return false if no shard id in context", func(t *testing.T) {
+		id, ok := ShardIDFrom(context.Background())
+		assert.False(t, ok)
+		assert.Zero(t, id)
+	})
+	t.Run("should be able to set in context and read from it", func(t *testing.T) {
+		shardID := faker.New().UInt()
+		ctx := With(context.Background(), WithShardID(shardID))
+		shard, ok := ShardIDFrom(ctx)
+		require.True(t, ok)
+		assert.Equal(t, shardID, shard)
+	})
+}
+
+func TestShardingKeyFrom(t *testing.T) {
+	t.Run("should be able return false if no shard key in context", func(t *testing.T) {
+		key, ok := ShardingKeyFrom(context.Background())
+		assert.Empty(t, key)
+		assert.False(t, ok)
+	})
+	t.Run("should be able to set in context and read from it", func(t *testing.T) {
+		shardingKey := faker.New().RandomStringWithLength(10)
+
+		ctx := With(context.Background(), WithShardingKey(shardingKey))
+		sharding, ok := ShardingKeyFrom(ctx)
+		require.True(t, ok)
+		assert.Equal(t, shardingKey, sharding)
 	})
 }

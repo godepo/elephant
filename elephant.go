@@ -19,3 +19,11 @@ func WithCanWrite(ctx context.Context) context.Context {
 func WithTransaction(tx pgx.Tx) pgcontext.OptionContext {
 	return pgcontext.WithTransaction(tx)
 }
+
+func WithShardID(id uint) pgcontext.OptionContext {
+	return pgcontext.WithShardID(id)
+}
+
+func WithShardingKey(key string) pgcontext.OptionContext {
+	return pgcontext.WithShardingKey(key)
+}
