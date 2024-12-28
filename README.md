@@ -1,9 +1,7 @@
 # Elephant
 [![codecov](https://codecov.io/gh/godepo/elephant/graph/badge.svg?token=I5M6SN6ZNI)](https://codecov.io/gh/godepo/elephant)
 [![Go Report Card](https://goreportcard.com/badge/godepo/elephant)](https://goreportcard.com/report/godepo/elephant)
-[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/{owner}/{repo}/badge)](https://scorecard.dev/viewer/?uri=github.com/godepo/elephant)
 [![License](https://img.shields.io/badge/License-MIT%202.0-blue.svg)](https://github.com/godepo/elephant/blob/main/LICENSE)
-[![OpenSSF Best Practices](https://www.bestpractices.dev/projects/9752/badge)](https://www.bestpractices.dev/projects/9752)
 
 Lightweight toolkit for using transactional queries through pgx driver and write clean and compact code. 
 
@@ -315,6 +313,97 @@ func main() {
 
 ```
 
+### Metrics and timeouts wrapper
+
+Construct regular node and add create collector for it. By example: use prometheus like there:
+
+```go
+func main() {
+    ctx := context.Background()
+    pool, err := pgxpool.New(ctx, "user=elephant password=slonjara port=5432 sslmode=disable host=localhost")
+    if err != nil {
+        panic(err)
+    }
+    db := regular.New(pool)
+    
+    latencies := prometheus.NewHistogramVec(
+        prometheus.HistogramOpts{
+        Name: "srv_0_queries_latency",
+        Help: "latency metrics for postgresql queries",
+        },
+        []string{"success", "user_find_by_id"},
+    )
+    qps := prometheus.NewCounterVec(prometheus.CounterOpts{
+        Name: "srv_0_queries_per_second",
+        Help: "queries per seconds for postgresql queries",
+        }, []string{"success", "user_find_by_id"},
+	)
+    
+    clt, err := metrics.Collector().
+        Latency(func(labels ...string) (collector.Histogram, error) {
+        return latencies.GetMetricWithLabelValues(labels...)
+    }).
+    QueryPerSecond(func(labels ...string) (collector.Counter, error) {
+        return qps.GetMetricWithLabelValues(labels...)
+    }).Build()
+    if err != nil {
+        panic(err)
+    }
+    
+    mtrDB := metrics.New(db, clt)
+    usrRepo := pgusers.New(mtrDB)
+    
+    if err = prometheus.Register(qps); err != nil {
+        panic(err)
+    }
+    if err = prometheus.Register(latencies); err != nil {
+        panic(err)
+    }
+    
+    http.HandleFunc("/users", func(w http.ResponseWriter, r *http.Request) {
+        _, err := usrRepo.FindByID(r.Context(), uuid.New())
+        if err != nil {
+            fmt.Println(err)
+            http.Error(w, err.Error(), http.StatusInternalServerError)
+	    }
+	})
+    http.Handle("/metrics", promhttp.Handler())
+    http.ListenAndServe(":8080", nil)
+    }
+```
+
+In repository method make this changes:
+
+```go
+const queryFindByID = `
+SELECT * FROM users WHERE id = $1;
+`
+const labelFindByID = `users_find_by_id`
+
+func (repo *Repository) FindByID(ctx context.Context, userID uuid.UUID) (user.Info, error) {
+	ctx = elephant.With(ctx,
+		elephant.WithMetricsLabel(labelFindByID),
+		elephant.WithTimeout(time.Second),
+	)
+	rows, err := repo.db.Query(ctx, queryFindByID, userID)
+	if err != nil {
+		return user.Info{}, err
+	}
+	res, err := pgx.CollectOneRow[user.Info](rows, pgx.RowToStructByName)
+	if err != nil {
+		return user.Info{}, err
+	}
+	return res, nil
+}
+```
+
+Annotation **elephant.WithMetricsLabel(labelFindByID)** specify query. By default, we add 
+"success" and "failure" for separate queries results. In the future, we have plans create auto-generation tool
+for generating elephants collectors like in these samples.
+
+Annotation **elephant.WithTimeout(time.Second)** present timeout for execution this query and cancel it 
+when timeout exceeded.
+ 
 ### Control execution flow
 
 #### Separate read/write queries

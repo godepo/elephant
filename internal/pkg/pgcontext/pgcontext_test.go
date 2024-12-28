@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -109,5 +110,35 @@ func TestShardingKeyFrom(t *testing.T) {
 		sharding, ok := ShardingKeyFrom(ctx)
 		require.True(t, ok)
 		assert.Equal(t, shardingKey, sharding)
+	})
+}
+
+func TestWithMetricsLabel(t *testing.T) {
+	t.Run("should be able return false, at empty context", func(t *testing.T) {
+		key, ok := MetricsLabelsFrom(context.Background())
+		assert.False(t, ok)
+		assert.Empty(t, key)
+	})
+	t.Run("should be able to return metrics label and true when its in context", func(t *testing.T) {
+		labels := []string{uuid.NewString()}
+		ctx := With(context.Background(), WithMetricsLabel(labels...))
+		out, ok := MetricsLabelsFrom(ctx)
+		assert.True(t, ok)
+		assert.Equal(t, labels, out)
+	})
+}
+
+func TestWithTimeout(t *testing.T) {
+	t.Run("should be able return false, at empty context", func(t *testing.T) {
+		key, ok := QueryTimeoutFrom(context.Background())
+		assert.False(t, ok)
+		assert.Zero(t, key)
+	})
+
+	t.Run("should be able to return metrics label and true when its in context", func(t *testing.T) {
+		ctx := With(context.Background(), WithTimeout(time.Hour))
+		out, ok := QueryTimeoutFrom(ctx)
+		assert.True(t, ok)
+		assert.Equal(t, time.Hour, out)
 	})
 }
