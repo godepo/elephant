@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/godepo/elephant/internal/pkg/pgcontext"
 	"github.com/jackc/pgx/v5"
@@ -26,10 +27,15 @@ type DB interface {
 	Exec(ctx context.Context, query string, args ...interface{}) (pgconn.CommandTag, error)
 }
 
+type MetricsCollector interface {
+	TrackQuery(ctx context.Context, begin time.Time, query string)
+}
+
 type Instance struct {
-	db               Pool
-	selector         func(ctx context.Context) DB
-	txErrPassMatcher func(context.Context, error) bool
+	db                      Pool
+	selector                func(ctx context.Context) DB
+	txErrPassMatcher        func(context.Context, error) bool
+	defaultMetricsCollector MetricsCollector
 }
 
 func New(db Pool) *Instance {

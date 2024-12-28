@@ -4,6 +4,7 @@ package pgcontext
 import (
 	"context"
 
+	"github.com/godepo/elephant/internal/metrics"
 	"github.com/jackc/pgx/v5"
 )
 
@@ -14,6 +15,8 @@ const (
 	optCanWrite
 	optTxOptions
 	optTxPassMatcher
+	optMetricsCollector
+	optMetricsLabel
 )
 
 type OptionContext func(ctx context.Context) context.Context
@@ -71,5 +74,27 @@ func WithFnTxPassMatcher(fn TxPassMatcher) OptionContext {
 
 func TxPassMatcherFrom(ctx context.Context) (TxPassMatcher, bool) {
 	res, ok := ctx.Value(optTxPassMatcher).(TxPassMatcher)
+	return res, ok
+}
+
+func WithMetricsLabel(label string) OptionContext {
+	return func(ctx context.Context) context.Context {
+		return context.WithValue(ctx, optMetricsCollector, label)
+	}
+}
+
+func MetricsLabelFrom(ctx context.Context) (string, bool) {
+	res, ok := ctx.Value(optMetricsCollector).(string)
+	return res, ok
+}
+
+func WithMetricsCollector(collector metrics.Collector) OptionContext {
+	return func(ctx context.Context) context.Context {
+		return context.WithValue(ctx, optMetricsLabel, collector)
+	}
+}
+
+func MetricsCollectorFrom(ctx context.Context) (metrics.Collector, bool) {
+	res, ok := ctx.Value(optMetricsCollector).(metrics.Collector)
 	return res, ok
 }
