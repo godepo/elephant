@@ -1,0 +1,14 @@
+with-expecter: True
+dir: ./
+mockname: "Mock{{.InterfaceName}}"
+filename: "mock_{{.InterfaceName}}_test.go"
+outpkg: "metrics"
+packages:
+  github.com/godepo/elephant/internal/metrics:
+    config:
+      all: False
+    interfaces:
+      Collector:
+        config:
+      Pool:
+        config:

@@ -2,8 +2,13 @@ package elephant
 
 import (
 	"context"
-	"github.com/jaswdr/faker/v2"
+	"errors"
 	"testing"
+	"time"
+
+	"github.com/google/uuid"
+	"github.com/jaswdr/faker/v2"
+	"github.com/stretchr/testify/require"
 
 	"github.com/godepo/elephant/internal/pkg/pgcontext"
 	"github.com/jackc/pgx/v5"
@@ -73,5 +78,67 @@ func TestWithShardingKey(t *testing.T) {
 		key, ok := pgcontext.ShardingKeyFrom(ctx)
 		assert.True(t, ok)
 		assert.Equal(t, expectedKey, key)
+	})
+}
+
+func TestWithMetricsLabel(t *testing.T) {
+	t.Run("should be able return false, at empty context", func(t *testing.T) {
+		key, ok := pgcontext.MetricsLabelsFrom(context.Background())
+		assert.False(t, ok)
+		assert.Empty(t, key)
+	})
+	t.Run("should be able to return metrics label and true when its in context", func(t *testing.T) {
+		labels := []string{uuid.NewString()}
+		ctx := With(context.Background(), WithMetricsLabel(labels...))
+		out, ok := pgcontext.MetricsLabelsFrom(ctx)
+		assert.True(t, ok)
+		assert.Equal(t, labels, out)
+	})
+}
+
+func TestWithTimeout(t *testing.T) {
+	t.Run("should be able return false, at empty context", func(t *testing.T) {
+		key, ok := pgcontext.QueryTimeoutFrom(context.Background())
+		assert.False(t, ok)
+		assert.Zero(t, key)
+	})
+
+	t.Run("should be able to return metrics label and true when its in context", func(t *testing.T) {
+		ctx := With(context.Background(), WithTimeout(time.Hour))
+		out, ok := pgcontext.QueryTimeoutFrom(ctx)
+		assert.True(t, ok)
+		assert.Equal(t, time.Hour, out)
+	})
+}
+
+func TestWithFnTxPassMatcher(t *testing.T) {
+	t.Run("should be able return false, at empty context", func(t *testing.T) {
+		_, ok := pgcontext.TxPassMatcherFrom(context.Background())
+		assert.False(t, ok)
+	})
+	t.Run("should be able to return tx pass matcher, when its in context", func(t *testing.T) {
+		ctx := With(context.Background(), WithFnTxPassMatcher(func(ctx context.Context, err error) bool {
+			return true
+		}))
+		fn, ok := pgcontext.TxPassMatcherFrom(ctx)
+		require.True(t, ok)
+		assert.True(t, fn(ctx, errors.New(uuid.NewString())))
+	})
+}
+
+func TestWithTxOptions(t *testing.T) {
+	t.Run("should be able return false, at empty context", func(t *testing.T) {
+		tx, ok := pgcontext.TxOptionsFrom(context.Background())
+		assert.False(t, ok)
+		assert.Zero(t, tx)
+	})
+	t.Run("should be able to return tx options, when its in context", func(t *testing.T) {
+		exp := pgx.TxOptions{
+			IsoLevel: pgx.Serializable,
+		}
+		ctx := With(context.Background(), WithTxOptions(exp))
+		opt, ok := pgcontext.TxOptionsFrom(ctx)
+		require.True(t, ok)
+		assert.Equal(t, exp, opt)
 	})
 }

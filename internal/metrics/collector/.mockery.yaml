@@ -1,0 +1,22 @@
+with-expecter: True
+dir: ./
+mockname: "Mock{{.InterfaceName}}"
+filename: "mock_{{.InterfaceName}}_test.go"
+
+packages:
+  github.com/godepo/elephant/internal/metrics/collector:
+    config:
+      all: False
+    interfaces:
+      Counter:
+        config:
+      Histogram:
+        config:
+      ErrorsLogInterceptor:
+        config:
+      Interceptor:
+        config:
+      HistogramCollector:
+        config:
+      CounterCollector:
+        config:
