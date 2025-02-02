@@ -10,19 +10,20 @@ Lightweight toolkit for using transactional queries through pgx driver and write
 ## Solving problems
 
 1. Write code with support nested transactions.
-2. Control postgresql node, when run query.
+2. Control postgresql node when run query.
 3. Automatic transactions commiting and rollback.
 4. Write code with compact method signatures.
 5. Using queries separation when using postgresql cluster (user replicas when no need write access and leader for others).
 6. Hide boilerplate inside common library.
-7. Control transactions through context
+7. Control transactions through context.
+8. Hiding sharded postgresql inside and using custom sharding functions
 
 ## Guide
 
 
 ### Create repository
 
-Create abstraction layer, for postgresql storing logic. For example using Greeing example from core pgx library:
+Create abstraction layer for postgresql storing logic. For example using Greeting example from core pgx library:
 
 ```go
 package repository
@@ -118,7 +119,7 @@ import (
 )
 
 func main() {
-	p, err := pgxpool.New(context.Background(), context.Background(), os.Getenv("DATABASE_URL"))
+	p, err := pgxpool.New(context.Background(), os.Getenv("DATABASE_URL"))
 	if err != nil {
 		_, _ = fmt.Fprintf(os.Stderr, "Unable to connect to database: %v\n", err)
 		os.Exit(1)
@@ -140,7 +141,7 @@ func main() {
 
 #### Cluster postgres
 
-When have one leader postgres and one or more replicas, can use DSL builder from "github.com/godepo/elephant/clusterpg":
+When have one leader postgres and one or more replicas can use DSL builder from "github.com/godepo/elephant/clusterpg":
 
 ```go
 package main
@@ -156,14 +157,14 @@ import (
 )
 
 func main() {
-	leader, err := pgxpool.New(context.Background(), context.Background(), os.Getenv("LEADER_URL"))
+	leader, err := pgxpool.New(context.Background(), os.Getenv("LEADER_URL"))
 	if err != nil {
 		_, _ = fmt.Fprintf(os.Stderr, "Unable to connect to database: %v\n", err)
 		os.Exit(1)
 	}
 	defer leader.Close()
 
-	replica, err := pgxpool.New(context.Background(), context.Background(), os.Getenv("REPLICA_URL"))
+	replica, err := pgxpool.New(context.Background(), os.Getenv("REPLICA_URL"))
 	if err != nil {
 		_, _ = fmt.Fprintf(os.Stderr, "Unable to connect to database: %v\n", err)
 		os.Exit(1)
@@ -194,6 +195,124 @@ func main() {
 	
 	fmt.Println(greeting)
 }
+```
+
+#### Sharded postgres
+
+When have sharded postgresql can use DSL builder from "github.com/godepo/elephant/shardedpg":
+
+```go
+type PG interface {
+	sharded.Pool
+}
+
+type Repository struct {
+	pool PG
+}
+
+func NewRepo(pool PG) *Repository {
+	return &Repository{pool: pool}
+}
+
+func (r *Repository) GetUserNameByPhoneNumber(ctx context.Context, number string) (string, error) {
+	var name string
+	err := r.pool.
+		QueryRow(ctx, `SELECT username FROM users WHERE phone = $1`, number).
+		Scan(&name)
+	if err != nil {
+		return "", err
+	}
+	return name, nil
+}
+
+type TxManager interface {
+	Transactional(ctx context.Context, fn func(ctx context.Context) error) (out error)
+}
+
+type UserRepository interface {
+	GetUserNameByPhoneNumber(ctx context.Context, number string) (string, error)
+}
+
+type Service struct {
+	txManager TxManager
+	userRepo  UserRepository
+}
+
+func NewService(txManager TxManager, userRepo UserRepository) *Service {
+	return &Service{txManager: txManager, userRepo: userRepo}
+}
+
+func (srv *Service) GetUserNameByPhoneNumber(ctx context.Context, number string) (result string, err error) {
+	// Shard ID will be found by your Picker function implementation
+	ctx = elephant.With(ctx, elephant.WithShardingKey(number))
+	// or you can set it directly using this:
+	// ctx = pgcontext.With(ctx, pgcontext.WithShardID(0))
+
+	if err = srv.txManager.Transactional(ctx, func(ctx context.Context) error {
+		res, err := srv.userRepo.GetUserNameByPhoneNumber(ctx, number)
+		if err != nil {
+			return err
+		}
+		result = res
+		return nil
+	}); err != nil {
+		return "", err
+	}
+	return result, nil
+}
+
+func main() {
+	shard0, err := pgxpool.New(context.Background(), os.Getenv("SHARD_URL_0"))
+	if err != nil {
+		_, _ = fmt.Fprintf(os.Stderr, "Unable to connect to database: %v\n", err)
+		os.Exit(1)
+	}
+	defer shard0.Close()
+
+	shard1, err := pgxpool.New(context.Background(), os.Getenv("SHARD_URL_1"))
+	if err != nil {
+		_, _ = fmt.Fprintf(os.Stderr, "Unable to connect to database: %v\n", err)
+		os.Exit(1)
+	}
+	defer shard0.Close()
+
+	shard2, err := pgxpool.New(context.Background(), os.Getenv("SHARD_URL_2"))
+	if err != nil {
+		_, _ = fmt.Fprintf(os.Stderr, "Unable to connect to database: %v\n", err)
+		os.Exit(1)
+	}
+	defer shard0.Close()
+
+	const poolSize = 3
+	// Create your sharded pool with Sharding function
+	pool, err :=
+		shardedpg.New(poolSize).
+			Picker(func(ctx context.Context, key string) uint {
+				hash := md5.Sum([]byte(key))
+				hashInt := new(big.Int).SetBytes(hash[:]).Int64()
+				return uint(hashInt) % poolSize
+			}).
+			Shard(0, singlepg.New(shard0)). // You can use any implementation of sharded.Pool interface like clusterpg, singlepg etc...
+			Shard(1, singlepg.New(shard1)).
+			Shard(2, singlepg.New(shard2)).
+			Go()
+
+	if err != nil {
+		_, _ = fmt.Fprintf(os.Stderr, "Unable to construct shards pool: %v\n", err)
+		os.Exit(1)
+	}
+
+	srv := NewService(pool, NewRepo(pool))
+
+	name, err := srv.GetUserNameByPhoneNumber(context.Background(), "1-202-456-1111")
+	if err != nil {
+		_, _ = fmt.Fprintf(os.Stderr, "Unable to greeing: %v\n", err)
+		os.Exit(1)
+	}
+
+	fmt.Println(name)
+}
+
 ```
 
 ### Control execution flow
