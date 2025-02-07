@@ -3,6 +3,7 @@ package pgcontext
 
 import (
 	"context"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 )
@@ -14,8 +15,11 @@ const (
 	optCanWrite
 	optTxOptions
 	optTxPassMatcher
+
+	optMetricsLabel
 	optShardID
 	optShardingKey
+	optQueryTimeout
 )
 
 type OptionContext func(ctx context.Context) context.Context
@@ -96,4 +100,26 @@ func WithShardingKey(shardingKey string) OptionContext {
 func ShardingKeyFrom(ctx context.Context) (string, bool) {
 	res, ok := ctx.Value(optShardingKey).(string)
 	return res, ok
+}
+
+func WithMetricsLabel(labels ...string) OptionContext {
+	return func(ctx context.Context) context.Context {
+		return context.WithValue(ctx, optMetricsLabel, labels)
+	}
+}
+
+func MetricsLabelsFrom(ctx context.Context) ([]string, bool) {
+	res, ok := ctx.Value(optMetricsLabel).([]string)
+	return res, ok
+}
+
+func QueryTimeoutFrom(ctx context.Context) (time.Duration, bool) {
+	dur, ok := ctx.Value(optQueryTimeout).(time.Duration)
+	return dur, ok
+}
+
+func WithTimeout(timeout time.Duration) OptionContext {
+	return func(ctx context.Context) context.Context {
+		return context.WithValue(ctx, optQueryTimeout, timeout)
+	}
 }
