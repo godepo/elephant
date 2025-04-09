@@ -9,6 +9,33 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
+type Interceptor func(ctx context.Context, err error) string
+
+type Counter interface {
+	Inc()
+}
+
+type Histogram interface {
+	Observe(since float64)
+}
+
+type HistogramCollector func(labels ...string) (Histogram, error)
+type CounterCollector func(labels ...string) (Counter, error)
+
+type ErrorsLogInterceptor func(err error)
+
+type MetricsCollector interface {
+	TrackQueryMetrics(ctx context.Context, begin time.Time, err error)
+}
+
+type MetricsBuilder interface {
+	QueryPerSecond(collector CounterCollector) MetricsBuilder
+	Latency(collector HistogramCollector) MetricsBuilder
+	ErrorsLogInterceptor(interceptor ErrorsLogInterceptor) MetricsBuilder
+	ResultsInterceptor(interceptor Interceptor) MetricsBuilder
+	Build() (MetricsCollector, error)
+}
+
 func With(ctx context.Context, opts ...pgcontext.OptionContext) context.Context {
 	return pgcontext.With(ctx, opts...)
 }

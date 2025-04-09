@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/godepo/elephant"
 	"github.com/godepo/elephant/internal/pkg/pgcontext"
 	"github.com/godepo/groat"
 	"github.com/google/uuid"
@@ -40,10 +41,10 @@ type Deps struct {
 	MockLatencyHistogram        *MockHistogram
 }
 
-func newCase(t *testing.T) *groat.Case[Deps, State, *Collector] {
-	tc := groat.New[Deps, State, *Collector](
+func newCase(t *testing.T) *groat.Case[Deps, State, elephant.MetricsCollector] {
+	tc := groat.New[Deps, State, elephant.MetricsCollector](
 		t,
-		func(t *testing.T, deps Deps) *Collector {
+		func(t *testing.T, deps Deps) elephant.MetricsCollector {
 			res, err := New().
 				ErrorsLogInterceptor(deps.MockErrorsLogsInterceptor.Execute).
 				ResultsInterceptor(deps.MockResultsInterceptor.Execute).
