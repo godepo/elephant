@@ -1,49 +1,53 @@
+version: "2"
 run:
-  # default concurrency is a available CPU number
   concurrency: 8
-  # timeout for analysis, e.g. 30s, 5m, default is 1m
-  deadline: 5m
-  # exit code when at least one issue was found, default is 1
   issues-exit-code: 1
-  # include test files or not, default is true
   tests: false
-
-output:
-  # colored-line-number|line-number|json|tab|checkstyle|code-climate, default is "colored-line-number"
-  formats: colored-line-number
-  # print lines of code with issue, default is true
-  # print-issued-lines: true
-  # print linter name in the end of issue text, default is true
-  # print-linter-name: true
-#issues:
-#  new-from-rev: d9a01bda
-#   exclude-use-default: false
-# all supported linters: https://golangci-lint.run/usage/linters/
 linters:
-  enable-all: true
-  fast: false
+  default: all
   disable:
-    - depguard # need to configure
-    - gofumpt
-    - varnamelen
     - containedctx
-    - wsl
-    - wrapcheck
+    - depguard
     - errname
+    - exhaustive
     - exhaustruct
     - forcetypeassert
-    - gosimple
     - ireturn
     - nlreturn
     - nonamedreturns
-    - exhaustive
-    - gci
-linters-settings:
-  lll:
-    line-length: 120
-  misspell:
-    locale: US
-issues:
-  exclude:
-    - seems to be unused, consider removing or renaming it as _
-    - assignments should only be cuddled with other assignments
+    - varnamelen
+    - wrapcheck
+    - tagalign
+    - tagliatelle
+    - wsl
+  settings:
+    lll:
+      line-length: 120
+    misspell:
+      locale: US
+  exclusions:
+    generated: lax
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling
+    rules:
+      - path: (.+)\.go$
+        text: seems to be unused, consider removing or renaming it as _
+      - path: (.+)\.go$
+        text: assignments should only be cuddled with other assignments
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
+formatters:
+  enable:
+    - gofmt
+    - goimports
+  exclusions:
+    generated: lax
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
