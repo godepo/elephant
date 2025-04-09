@@ -2,9 +2,9 @@ with-expecter: True
 dir: ./
 mockname: "Mock{{.InterfaceName}}"
 filename: "mock_{{.InterfaceName}}_test.go"
-
+outpkg: collector
 packages:
-  github.com/godepo/elephant/internal/metrics/collector:
+  github.com/godepo/elephant:
     config:
       all: False
     interfaces:

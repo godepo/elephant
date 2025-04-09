@@ -1,9 +1,11 @@
+//go:generate mockery
 package collector
 
 import (
 	"context"
 	"errors"
 
+	"github.com/godepo/elephant"
 	"github.com/godepo/elephant/internal/pkg/monads"
 )
 
@@ -13,37 +15,37 @@ var (
 )
 
 type builder struct {
-	queryPerSeconds    monads.Optional[CounterCollector]
-	queryLatency       monads.Optional[HistogramCollector]
-	logInterceptor     monads.Optional[ErrorsLogInterceptor]
-	resultsInterceptor monads.Optional[Interceptor]
+	queryPerSeconds    monads.Optional[elephant.CounterCollector]
+	queryLatency       monads.Optional[elephant.HistogramCollector]
+	logInterceptor     monads.Optional[elephant.ErrorsLogInterceptor]
+	resultsInterceptor monads.Optional[elephant.Interceptor]
 }
 
-func (b builder) ResultsInterceptor(interceptor Interceptor) Builder {
+func (b builder) ResultsInterceptor(interceptor elephant.Interceptor) elephant.MetricsBuilder {
 	cln := b.clone()
 	cln.resultsInterceptor = monads.OptionalOf(interceptor)
 	return cln
 }
 
-func (b builder) ErrorsLogInterceptor(interceptor ErrorsLogInterceptor) Builder {
+func (b builder) ErrorsLogInterceptor(interceptor elephant.ErrorsLogInterceptor) elephant.MetricsBuilder {
 	cln := b.clone()
 	cln.logInterceptor = monads.OptionalOf(interceptor)
 	return cln
 }
 
-func (b builder) QueryPerSecond(collector CounterCollector) Builder {
+func (b builder) QueryPerSecond(collector elephant.CounterCollector) elephant.MetricsBuilder {
 	cln := b.clone()
 	cln.queryPerSeconds = monads.OptionalOf(collector)
 	return cln
 }
 
-func (b builder) Latency(collector HistogramCollector) Builder {
+func (b builder) Latency(collector elephant.HistogramCollector) elephant.MetricsBuilder {
 	cln := b.clone()
 	cln.queryLatency = monads.OptionalOf(collector)
 	return cln
 }
 
-func (b builder) Build() (*Collector, error) {
+func (b builder) Build() (elephant.MetricsCollector, error) {
 	if b.queryPerSeconds.IsEmpty() {
 		return nil, ErrQueryPerSecondIsRequired
 	}
@@ -76,7 +78,7 @@ func (b builder) clone() builder {
 	return out
 }
 
-func New() Builder {
+func New() elephant.MetricsBuilder {
 	return builder{}
 }
 

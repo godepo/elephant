@@ -5,6 +5,7 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/godepo/elephant"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -18,7 +19,7 @@ func TestBuilder_QueryPerSecond(t *testing.T) {
 		require.True(t, ok)
 		require.True(t, tmp.queryPerSeconds.IsEmpty())
 
-		bld = bld.QueryPerSecond(func(labels ...string) (Counter, error) {
+		bld = bld.QueryPerSecond(func(labels ...string) (elephant.Counter, error) {
 			return exp, nil
 		})
 
@@ -41,7 +42,7 @@ func TestBuilder_Latency(t *testing.T) {
 		require.True(t, ok)
 		require.True(t, tmp.queryLatency.IsEmpty())
 
-		bld = bld.Latency(func(labels ...string) (Histogram, error) {
+		bld = bld.Latency(func(labels ...string) (elephant.Histogram, error) {
 			return exp, nil
 		})
 		res, ok := bld.(builder)
@@ -111,10 +112,10 @@ func TestBuilder_Build(t *testing.T) {
 		var logErr error
 
 		col, err := New().
-			Latency(func(labels ...string) (Histogram, error) {
+			Latency(func(labels ...string) (elephant.Histogram, error) {
 				return ltc, nil
 			}).
-			QueryPerSecond(func(labels ...string) (Counter, error) {
+			QueryPerSecond(func(labels ...string) (elephant.Counter, error) {
 				return cnt, nil
 			}).
 			ErrorsLogInterceptor(func(takenErr error) {
@@ -127,10 +128,12 @@ func TestBuilder_Build(t *testing.T) {
 			Build()
 		require.NoError(t, err)
 
-		col.logInterceptor(randomLogErr)
+		res := col.(*Collector)
+
+		res.logInterceptor(randomLogErr)
 		assert.Equal(t, randomLogErr, logErr)
 
-		resultLabel := col.interceptor(context.Background(), randomResultErr)
+		resultLabel := res.interceptor(context.Background(), randomResultErr)
 		assert.Equal(t, randomResultErr, resErr)
 		assert.Equal(t, expString, resultLabel)
 	})
@@ -143,21 +146,22 @@ func TestBuilder_Build(t *testing.T) {
 		var randomResultErr = errors.New(uuid.NewString())
 
 		col, err := New().
-			Latency(func(labels ...string) (Histogram, error) {
+			Latency(func(labels ...string) (elephant.Histogram, error) {
 				return ltc, nil
 			}).
-			QueryPerSecond(func(labels ...string) (Counter, error) {
+			QueryPerSecond(func(labels ...string) (elephant.Counter, error) {
 				return cnt, nil
 			}).
 			Build()
 		require.NoError(t, err)
 
-		col.logInterceptor(randomLogErr)
+		res := col.(*Collector)
+		res.logInterceptor(randomLogErr)
 
-		resultLabel := col.interceptor(context.Background(), randomResultErr)
+		resultLabel := res.interceptor(context.Background(), randomResultErr)
 		assert.Equal(t, InterceptAsFailure, resultLabel)
 
-		resultLabel = col.interceptor(context.Background(), nil)
+		resultLabel = res.interceptor(context.Background(), nil)
 		assert.Equal(t, InterceptAsSuccess, resultLabel)
 	})
 
@@ -168,7 +172,7 @@ func TestBuilder_Build(t *testing.T) {
 			assert.Nil(t, col)
 		})
 		t.Run("when query latency collector is present", func(t *testing.T) {
-			col, err := New().QueryPerSecond(func(labels ...string) (Counter, error) {
+			col, err := New().QueryPerSecond(func(labels ...string) (elephant.Counter, error) {
 				return nil, nil
 			}).Build()
 			require.ErrorIs(t, err, ErrQueryLatencyIsRequired)
