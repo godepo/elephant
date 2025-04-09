@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/godepo/elephant"
 	"github.com/godepo/elephant/internal/pkg/pgcontext"
 )
 
@@ -15,13 +16,11 @@ var (
 	ErrCantQetQueryLatencyCollector   = errors.New("can't query latency collector")
 )
 
-type ErrorsLogInterceptor func(err error)
-
 type Collector struct {
-	interceptor             Interceptor
-	queryPerSecondCollector CounterCollector
-	queryResultsCollector   HistogramCollector
-	logInterceptor          ErrorsLogInterceptor
+	interceptor             elephant.Interceptor
+	queryPerSecondCollector elephant.CounterCollector
+	queryResultsCollector   elephant.HistogramCollector
+	logInterceptor          elephant.ErrorsLogInterceptor
 }
 
 func (clt *Collector) TrackQueryMetrics(ctx context.Context, begin time.Time, err error) {

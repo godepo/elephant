@@ -2,11 +2,12 @@
 package metrics
 
 import (
+	"github.com/godepo/elephant"
 	"github.com/godepo/elephant/internal/metrics"
 	"github.com/godepo/elephant/internal/metrics/collector"
 )
 
-func Collector() collector.Builder {
+func Collector() elephant.MetricsBuilder {
 	return collector.New()
 }
 
