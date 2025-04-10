@@ -1,22 +1,13 @@
-with-expecter: True
-dir: ./
-mockname: "Mock{{.InterfaceName}}"
 filename: "mock_{{.InterfaceName}}_test.go"
-outpkg: collector
+force-file-write: true
+dir: ./
+structname: Mock{{.InterfaceName}}
+pkgname: collector
+template: testify
 packages:
   github.com/godepo/elephant:
     config:
-      all: False
+      all: false
     interfaces:
-      Counter:
-        config:
-      Histogram:
-        config:
-      ErrorsLogInterceptor:
-        config:
-      Interceptor:
-        config:
-      HistogramCollector:
-        config:
-      CounterCollector:
-        config:
+      Counter: {}
+      Histogram: {}

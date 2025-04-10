@@ -1,18 +1,19 @@
-with-expecter: True
-dir: ./
-mockname: "Mock{{.InterfaceName}}"
 filename: "mock_{{.InterfaceName}}_test.go"
-outpkg: "regular"
+dir: ./
+structname: Mock{{.InterfaceName}}
+pkgname: regular
+template: testify
+force-file-write: true
 packages:
   github.com/godepo/elephant/internal/regular:
     config:
-      all: False
+      all: false
     interfaces:
-      DB:
-        config:
-      Pool:
-        config:
+      DB: {}
+      Pool: {}
   github.com/jackc/pgx/v5:
     config:
-      all: False
-      include-regex: "Rows|Tx"
+      all: false
+    interfaces:
+      Rows: {}
+      Tx: {}

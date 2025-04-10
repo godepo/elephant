@@ -1,8 +1,8 @@
-filename: "mock_{{.InterfaceName}}_test.go"
 dir: ./
 structname: Mock{{.InterfaceName}}
-pkgname: cluster
+pkgname: clusterpg
 template: testify
+filename: mocks_{{.InterfaceName}}_test.go
 force-file-write: true
 packages:
   github.com/godepo/elephant/internal/cluster:
@@ -15,6 +15,6 @@ packages:
     config:
       all: false
     interfaces:
-      Rows: { }
-      Tx: { }
-      Row: { }
+      Rows: {}
+      Tx: {}
+      Row: {}

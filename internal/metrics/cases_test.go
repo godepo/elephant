@@ -66,8 +66,8 @@ type State struct {
 	Calls  Calls
 }
 
-func newCase(t *testing.T) *groat.Case[Deps, State, DB] {
-	tc := groat.New[Deps, State, DB](t, func(t *testing.T, deps Deps) DB {
+func newCase(t *testing.T) *groat.Case[Deps, State, *DB] {
+	tc := groat.New[Deps, State, *DB](t, func(t *testing.T, deps Deps) *DB {
 		return New(deps.Pool, deps.Collector)
 	}, func(t *testing.T, deps Deps) Deps {
 		deps.Pool = NewMockPool(t)
@@ -200,9 +200,15 @@ func ActBeginTx(t *testing.T, deps Deps, state State) State {
 
 func ActDBQueryRow(t *testing.T, deps Deps, state State) State {
 	t.Helper()
-	deps.Pool.EXPECT().
-		QueryRow(state.Given.ctx, state.Given.Query, state.Given.QueryArgs...).
-		Return(state.Calls.ResultQueryRow)
+	if len(state.Given.QueryArgs) > 0 {
+		deps.Pool.EXPECT().
+			QueryRow(state.Given.ctx, state.Given.Query, state.Given.QueryArgs).
+			Return(state.Calls.ResultQueryRow)
+	} else {
+		deps.Pool.EXPECT().
+			QueryRow(state.Given.ctx, state.Given.Query).
+			Return(state.Calls.ResultQueryRow)
+	}
 	return state
 }
 
@@ -216,7 +222,7 @@ func ActTrackQueryMetricsForExec(t *testing.T, deps Deps, state State) State {
 func ActScan(t *testing.T, _ Deps, state State) State {
 	t.Helper()
 	state.Calls.ResultQueryRow.EXPECT().
-		Scan(state.Given.RowScanArgs...).
+		Scan(state.Given.RowScanArgs).
 		Return(state.Given.ErrRowScan)
 	return state
 }
@@ -236,7 +242,7 @@ func ActRowsClose(t *testing.T, _ Deps, state State) State {
 func ActRowsScan(t *testing.T, _ Deps, state State) State {
 	t.Helper()
 	state.Calls.ResultQueryRows.EXPECT().
-		Scan(state.Given.RowScanArgs...).
+		Scan(state.Given.RowScanArgs).
 		Return(state.Calls.ErrRowScan)
 	return state
 }
@@ -250,9 +256,15 @@ func ActTrackQueryMetricsForQuery(t *testing.T, deps Deps, state State) State {
 
 func ActDBQuery(t *testing.T, deps Deps, state State) State {
 	t.Helper()
-	deps.Pool.EXPECT().
-		Query(state.Given.ctx, state.Given.Query, state.Given.QueryArgs...).
-		Return(state.Calls.ResultQueryRows, state.Calls.ErrQuery)
+	if len(state.Given.QueryArgs) > 0 {
+		deps.Pool.EXPECT().
+			Query(state.Given.ctx, state.Given.Query, state.Given.QueryArgs).
+			Return(state.Calls.ResultQueryRows, state.Calls.ErrQuery)
+	} else {
+		deps.Pool.EXPECT().
+			Query(state.Given.ctx, state.Given.Query).
+			Return(state.Calls.ResultQueryRows, state.Calls.ErrQuery)
+	}
 
 	return state
 }
@@ -279,9 +291,16 @@ func ActRowsErr(t *testing.T, _ Deps, state State) State {
 
 func ActExec(t *testing.T, deps Deps, state State) State {
 	t.Helper()
-	deps.Pool.EXPECT().
-		Exec(state.Given.ctx, state.Given.Query, state.Given.QueryArgs...).
-		Return(state.Calls.ExecTag, state.Calls.ErrExec)
+	if len(state.Given.QueryArgs) > 0 {
+		deps.Pool.EXPECT().
+			Exec(state.Given.ctx, state.Given.Query, state.Given.QueryArgs).
+			Return(state.Calls.ExecTag, state.Calls.ErrExec)
+	} else {
+		deps.Pool.EXPECT().
+			Exec(state.Given.ctx, state.Given.Query).
+			Return(state.Calls.ExecTag, state.Calls.ErrExec)
+	}
+
 	return state
 }
 

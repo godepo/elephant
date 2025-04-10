@@ -117,6 +117,7 @@ func ArrangeNilValueShard(shardID uint) func(t *testing.T, state State) State {
 func ArrangeShardPicker(t *testing.T, state State) State {
 	t.Helper()
 	state.shardPicker = func(ctx context.Context, key string) uint {
+		t.Logf("pick shard: %d", state.shardID)
 		return state.shardID
 	}
 	return state
@@ -195,8 +196,9 @@ func ActBeginTx(t *testing.T, deps Deps, state State) State {
 
 func ActQuery(t *testing.T, deps Deps, state State) State {
 	t.Helper()
+	t.Logf("query at shard: %d", state.shardID)
 	deps.shardMocks[state.shardID].EXPECT().
-		Query(state.ctx, state.Expect.Query, state.Expect.Args...).
+		Query(state.ctx, state.Expect.Query, state.Expect.Args).
 		Return(state.Expect.Rows, nil)
 	return state
 }
@@ -204,7 +206,7 @@ func ActQuery(t *testing.T, deps Deps, state State) State {
 func ActQueryRow(t *testing.T, deps Deps, state State) State {
 	t.Helper()
 	deps.shardMocks[state.shardID].EXPECT().
-		QueryRow(state.ctx, state.Expect.Query, state.Expect.Args...).
+		QueryRow(state.ctx, state.Expect.Query, state.Expect.Args).
 		Return(state.Expect.Row)
 	return state
 }
@@ -212,7 +214,7 @@ func ActQueryRow(t *testing.T, deps Deps, state State) State {
 func ActExec(t *testing.T, deps Deps, state State) State {
 	t.Helper()
 	deps.shardMocks[state.shardID].EXPECT().
-		Exec(state.ctx, state.Expect.Query, state.Expect.Args...).
+		Exec(state.ctx, state.Expect.Query, state.Expect.Args).
 		Return(pgconn.CommandTag{}, nil)
 	return state
 }

@@ -1,11 +1,12 @@
 dir: ./
 structname: Mock{{.InterfaceName}}
-pkgname: pgcontext
+pkgname: acceptance
 template: testify
 force-file-write: true
 packages:
-  github.com/jackc/pgx/v5:
+  github.com/godepo/elephant/internal/metrics:
     config:
       all: false
     interfaces:
-      Tx: {}
+      Collector: {}
+      Pool: {}

@@ -1,11 +1,10 @@
 dir: ./
 structname: Mock{{.InterfaceName}}
-pkgname: pgcontext
+pkgname: elephant
 template: testify
 force-file-write: true
 packages:
   github.com/jackc/pgx/v5:
     config:
       all: false
-    interfaces:
-      Tx: {}
+      include-interface-regex: Tx

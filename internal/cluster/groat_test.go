@@ -105,13 +105,13 @@ func ActExec(fellowNum int) groat.When[Deps, State] {
 		switch fellowNum {
 		case runAtTx:
 			deps.Tx.EXPECT().
-				Exec(state.ctx, state.Expect.Query, state.Expect.Args...).Return(pgconn.CommandTag{}, nil)
+				Exec(state.ctx, state.Expect.Query, state.Expect.Args).Return(pgconn.CommandTag{}, nil)
 		case runAtLeader:
 			deps.Fellows[fellowNum].EXPECT().
-				Exec(state.ctx, state.Expect.Query, state.Expect.Args...).Return(pgconn.CommandTag{}, nil)
+				Exec(state.ctx, state.Expect.Query, state.Expect.Args).Return(pgconn.CommandTag{}, nil)
 		default:
 			deps.Fellows[fellowNum].EXPECT().
-				Exec(state.ctx, state.Expect.Query, state.Expect.Args...).Return(pgconn.CommandTag{}, nil)
+				Exec(state.ctx, state.Expect.Query, state.Expect.Args).Return(pgconn.CommandTag{}, nil)
 		}
 
 		return state
@@ -123,15 +123,15 @@ func ActExecFailed(fellowNum int) groat.When[Deps, State] {
 		switch fellowNum {
 		case runAtTx:
 			deps.Tx.EXPECT().
-				Exec(state.ctx, state.Expect.Query, state.Expect.Args...).
+				Exec(state.ctx, state.Expect.Query, state.Expect.Args).
 				Return(pgconn.CommandTag{}, state.Expect.Error)
 		case runAtLeader:
 			deps.Fellows[fellowNum].EXPECT().
-				Exec(state.ctx, state.Expect.Query, state.Expect.Args...).
+				Exec(state.ctx, state.Expect.Query, state.Expect.Args).
 				Return(pgconn.CommandTag{}, state.Expect.Error)
 		default:
 			deps.Fellows[fellowNum].EXPECT().
-				Exec(state.ctx, state.Expect.Query, state.Expect.Args...).
+				Exec(state.ctx, state.Expect.Query, state.Expect.Args).
 				Return(pgconn.CommandTag{}, state.Expect.Error)
 		}
 
@@ -144,13 +144,13 @@ func ActQueryRow(fellowNum int) groat.When[Deps, State] {
 		switch fellowNum {
 		case runAtTx:
 			deps.Tx.EXPECT().
-				QueryRow(state.ctx, state.Expect.Query, state.Expect.Args...).Return(deps.Row)
+				QueryRow(state.ctx, state.Expect.Query, state.Expect.Args).Return(deps.Row)
 		case runAtLeader:
 			deps.Leader.EXPECT().
-				QueryRow(state.ctx, state.Expect.Query, state.Expect.Args...).Return(deps.Row)
+				QueryRow(state.ctx, state.Expect.Query, state.Expect.Args).Return(deps.Row)
 		default:
 			deps.Fellows[fellowNum].EXPECT().
-				QueryRow(state.ctx, state.Expect.Query, state.Expect.Args...).Return(deps.Row)
+				QueryRow(state.ctx, state.Expect.Query, state.Expect.Args).Return(deps.Row)
 		}
 		state.Expect.Row = deps.Row
 		return state
@@ -162,13 +162,13 @@ func ActQuery(fellowNum int) groat.When[Deps, State] {
 		switch fellowNum {
 		case runAtLeader:
 			deps.Leader.EXPECT().
-				Query(state.ctx, state.Expect.Query, state.Expect.Args...).Return(deps.Rows, nil)
+				Query(state.ctx, state.Expect.Query, state.Expect.Args).Return(deps.Rows, nil)
 		case runAtTx:
 			deps.Tx.EXPECT().
-				Query(state.ctx, state.Expect.Query, state.Expect.Args...).Return(deps.Rows, nil)
+				Query(state.ctx, state.Expect.Query, state.Expect.Args).Return(deps.Rows, nil)
 		default:
 			deps.Fellows[fellowNum].EXPECT().
-				Query(state.ctx, state.Expect.Query, state.Expect.Args...).Return(deps.Rows, nil)
+				Query(state.ctx, state.Expect.Query, state.Expect.Args).Return(deps.Rows, nil)
 		}
 		state.Expect.Rows = deps.Rows
 		return state
@@ -179,7 +179,7 @@ func ActQueryAtTx(t *testing.T, deps Deps, state State) State {
 	t.Helper()
 
 	deps.Tx.EXPECT().
-		Query(state.ctx, state.Expect.Query, state.Expect.Args...).Return(deps.Rows, nil)
+		Query(state.ctx, state.Expect.Query, state.Expect.Args).Return(deps.Rows, nil)
 	state.Expect.Rows = deps.Rows
 	return state
 }
@@ -187,7 +187,7 @@ func ActQueryAtTx(t *testing.T, deps Deps, state State) State {
 func ActQueryFailed(fellowNum int) groat.When[Deps, State] {
 	return func(t *testing.T, deps Deps, state State) State {
 		deps.Fellows[fellowNum].EXPECT().
-			Query(state.ctx, state.Expect.Query, state.Expect.Args...).Return(nil, state.Expect.Error)
+			Query(state.ctx, state.Expect.Query, state.Expect.Args).Return(nil, state.Expect.Error)
 		return state
 	}
 }
