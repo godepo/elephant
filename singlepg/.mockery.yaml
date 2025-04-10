@@ -1,16 +1,17 @@
-with-expecter: True
-dir: ./
-mockname: "Mock{{.InterfaceName}}"
 filename: "mock_{{.InterfaceName}}_test.go"
-outpkg: "singlepg"
+dir: ./
+structname: Mock{{.InterfaceName}}
+pkgname: singlepg
+template: testify
+force-file-write: true
 packages:
   github.com/godepo/elephant/internal/cluster:
     config:
-      all: False
+      all: false
     interfaces:
-      Pool:
-        config:
+      Pool: {}
   github.com/jackc/pgx/v5:
     config:
-      all: False
-      include-regex: "Tx"
+      all: false
+      include-interface-regex: Tx
+

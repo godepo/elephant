@@ -5,7 +5,7 @@
 // The package is designed to be used as a wrapper around your existing database connection pool
 // when you need to collect metrics about database operations in your application.
 //
-//go:generate mockery
+//go:generate go tool mockery
 package metrics
 
 import (
@@ -48,8 +48,8 @@ type DB struct {
 //
 // Returns:
 //   - DB: A new metrics-enabled database instance.
-func New(db Pool, collector Collector) DB {
-	return DB{
+func New(db Pool, collector Collector) *DB {
+	return &DB{
 		db:                      db,
 		defaultMetricsCollector: collector,
 	}

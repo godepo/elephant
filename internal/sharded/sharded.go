@@ -1,3 +1,4 @@
+//go:generate go tool mockery
 package sharded
 
 import (
