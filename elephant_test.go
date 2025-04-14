@@ -20,7 +20,9 @@ func TestCanWriteFrom(t *testing.T) {
 		assert.False(t, pgcontext.CanWriteFrom(context.Background()))
 	})
 	t.Run("should be able to return true, when can write set in context", func(t *testing.T) {
-		assert.True(t, pgcontext.CanWriteFrom(With(context.Background(), WithCanWrite)))
+		ctx := With(context.Background(), WithCanWrite)
+		assert.True(t, pgcontext.CanWriteFrom(ctx))
+		assert.True(t, CanWriteFrom(ctx))
 	})
 }
 
@@ -42,7 +44,6 @@ func TestWithTransaction(t *testing.T) {
 	})
 
 	t.Run("should be able to write in context and get from it", func(t *testing.T) {
-
 		ctx := With(context.Background(), WithTransaction(NewMockTx(t)))
 
 		tx, ok := pgcontext.TransactionFrom(ctx)
@@ -63,6 +64,10 @@ func TestWithShardID(t *testing.T) {
 		id, ok := pgcontext.ShardIDFrom(ctx)
 		assert.True(t, ok)
 		assert.Equal(t, expectedShardID, id)
+
+		pubID, ok := ShardIDFrom(ctx)
+		require.True(t, ok)
+		assert.Equal(t, expectedShardID, pubID)
 	})
 }
 
@@ -78,6 +83,10 @@ func TestWithShardingKey(t *testing.T) {
 		key, ok := pgcontext.ShardingKeyFrom(ctx)
 		assert.True(t, ok)
 		assert.Equal(t, expectedKey, key)
+
+		pubKey, ok := ShardingKeyFrom(ctx)
+		require.True(t, ok)
+		assert.Equal(t, expectedKey, pubKey)
 	})
 }
 
@@ -93,6 +102,10 @@ func TestWithMetricsLabel(t *testing.T) {
 		out, ok := pgcontext.MetricsLabelsFrom(ctx)
 		assert.True(t, ok)
 		assert.Equal(t, labels, out)
+
+		pubLabels, ok := MetricsLabelFrom(ctx)
+		require.True(t, ok)
+		assert.Equal(t, labels, pubLabels)
 	})
 }
 
@@ -108,6 +121,10 @@ func TestWithTimeout(t *testing.T) {
 		out, ok := pgcontext.QueryTimeoutFrom(ctx)
 		assert.True(t, ok)
 		assert.Equal(t, time.Hour, out)
+
+		pubOut, ok := TimeoutFrom(ctx)
+		assert.True(t, ok)
+		assert.Equal(t, time.Hour, pubOut)
 	})
 }
 
@@ -140,5 +157,9 @@ func TestWithTxOptions(t *testing.T) {
 		opt, ok := pgcontext.TxOptionsFrom(ctx)
 		require.True(t, ok)
 		assert.Equal(t, exp, opt)
+
+		pubOpt, ok := TxOptionsFrom(ctx)
+		require.True(t, ok)
+		assert.Equal(t, exp, pubOpt)
 	})
 }

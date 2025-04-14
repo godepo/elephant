@@ -46,6 +46,10 @@ func WithCanWrite(ctx context.Context) context.Context {
 	return pgcontext.WithCanWrite(ctx)
 }
 
+func CanWriteFrom(ctx context.Context) bool {
+	return pgcontext.CanWriteFrom(ctx)
+}
+
 func WithTransaction(tx pgx.Tx) pgcontext.OptionContext {
 	return pgcontext.WithTransaction(tx)
 }
@@ -54,20 +58,40 @@ func WithMetricsLabel(metricsLabels ...string) pgcontext.OptionContext {
 	return pgcontext.WithMetricsLabel(metricsLabels...)
 }
 
+func MetricsLabelFrom(ctx context.Context) ([]string, bool) {
+	return pgcontext.MetricsLabelsFrom(ctx)
+}
+
 func WithShardID(id uint) pgcontext.OptionContext {
 	return pgcontext.WithShardID(id)
+}
+
+func ShardIDFrom(ctx context.Context) (uint, bool) {
+	return pgcontext.ShardIDFrom(ctx)
 }
 
 func WithShardingKey(key string) pgcontext.OptionContext {
 	return pgcontext.WithShardingKey(key)
 }
 
+func ShardingKeyFrom(ctx context.Context) (string, bool) {
+	return pgcontext.ShardingKeyFrom(ctx)
+}
+
 func WithTimeout(timeout time.Duration) pgcontext.OptionContext {
 	return pgcontext.WithTimeout(timeout)
 }
 
+func TimeoutFrom(ctx context.Context) (time.Duration, bool) {
+	return pgcontext.QueryTimeoutFrom(ctx)
+}
+
 func WithTxOptions(opt pgx.TxOptions) pgcontext.OptionContext {
 	return pgcontext.WithTxOptions(opt)
+}
+
+func TxOptionsFrom(ctx context.Context) (pgx.TxOptions, bool) {
+	return pgcontext.TxOptionsFrom(ctx)
 }
 
 func WithFnTxPassMatcher(fn pgcontext.TxPassMatcher) pgcontext.OptionContext {
