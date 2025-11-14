@@ -38,7 +38,7 @@ func TestWithTransaction(t *testing.T) {
 
 		ctx := With(context.Background(), WithTransaction(tx))
 
-		tx, ok := pgcontext.TransactionFrom(ctx)
+		tx, ok := TransactionFrom(ctx)
 		assert.False(t, ok)
 		assert.Nil(t, tx)
 	})
