@@ -54,6 +54,10 @@ func WithTransaction(tx pgx.Tx) pgcontext.OptionContext {
 	return pgcontext.WithTransaction(tx)
 }
 
+func TransactionFrom(ctx context.Context) (pgx.Tx, bool) {
+	return pgcontext.TransactionFrom(ctx)
+}
+
 func WithMetricsLabel(metricsLabels ...string) pgcontext.OptionContext {
 	return pgcontext.WithMetricsLabel(metricsLabels...)
 }
