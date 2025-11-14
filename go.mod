@@ -7,7 +7,7 @@ require (
 	github.com/godepo/pgrx v0.0.5
 	github.com/google/uuid v1.6.0
 	github.com/jackc/pgx/v5 v5.7.6
-	github.com/jaswdr/faker/v2 v2.6.0
+	github.com/jaswdr/faker/v2 v2.9.0
 	github.com/stretchr/testify v1.11.1
 )
 
