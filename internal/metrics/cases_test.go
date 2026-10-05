@@ -202,11 +202,11 @@ func ActDBQueryRow(t *testing.T, deps Deps, state State) State {
 	t.Helper()
 	if len(state.Given.QueryArgs) > 0 {
 		deps.Pool.EXPECT().
-			QueryRow(state.Given.ctx, state.Given.Query, state.Given.QueryArgs).
+			QueryRow(queryContextMatcher(state.Given.ctx), state.Given.Query, state.Given.QueryArgs).
 			Return(state.Calls.ResultQueryRow)
 	} else {
 		deps.Pool.EXPECT().
-			QueryRow(state.Given.ctx, state.Given.Query).
+			QueryRow(queryContextMatcher(state.Given.ctx), state.Given.Query).
 			Return(state.Calls.ResultQueryRow)
 	}
 	return state
@@ -258,11 +258,11 @@ func ActDBQuery(t *testing.T, deps Deps, state State) State {
 	t.Helper()
 	if len(state.Given.QueryArgs) > 0 {
 		deps.Pool.EXPECT().
-			Query(state.Given.ctx, state.Given.Query, state.Given.QueryArgs).
+			Query(queryContextMatcher(state.Given.ctx), state.Given.Query, state.Given.QueryArgs).
 			Return(state.Calls.ResultQueryRows, state.Calls.ErrQuery)
 	} else {
 		deps.Pool.EXPECT().
-			Query(state.Given.ctx, state.Given.Query).
+			Query(queryContextMatcher(state.Given.ctx), state.Given.Query).
 			Return(state.Calls.ResultQueryRows, state.Calls.ErrQuery)
 	}
 
@@ -364,4 +364,14 @@ func AssertExpectedTx(t *testing.T, state State) {
 func AssertNoError(t *testing.T, state State) {
 	t.Helper()
 	require.NoError(t, state.Result.Error)
+}
+
+func queryContextMatcher(ctx context.Context) any {
+	if _, ok := pgcontext.QueryTimeoutFrom(ctx); ok {
+		return mock.MatchedBy(func(actual context.Context) bool {
+			_, hasDeadline := actual.Deadline()
+			return hasDeadline
+		})
+	}
+	return ctx
 }
