@@ -97,7 +97,7 @@ func (ins *Instance) nestedTx(ctx context.Context, tx pgx.Tx, fn func(ctx contex
 	defer func() {
 		rollbackErr := nested.Rollback(ctx)
 		if rollbackErr != nil && !errors.Is(rollbackErr, pgx.ErrTxClosed) {
-			out = rollbackErr
+			out = errors.Join(out, fmt.Errorf("can't rollback nested transaction: %w", rollbackErr))
 		}
 	}()
 
