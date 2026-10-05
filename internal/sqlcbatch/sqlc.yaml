@@ -1,0 +1,10 @@
+version: "2"
+sql:
+  - engine: postgresql
+    schema: queries/schema.sql
+    queries: queries/batch.sql
+    gen:
+      go:
+        package: sqlcbatch
+        out: .
+        sql_package: pgx/v5

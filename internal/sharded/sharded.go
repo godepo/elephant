@@ -4,7 +4,9 @@ package sharded
 import (
 	"context"
 	"errors"
+	"fmt"
 
+	"github.com/godepo/elephant/internal/pkg/batchresults"
 	"github.com/godepo/elephant/internal/pkg/pgcontext"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -26,6 +28,7 @@ type Pool interface {
 	Query(ctx context.Context, query string, args ...interface{}) (pgx.Rows, error)
 	QueryRow(ctx context.Context, query string, args ...interface{}) pgx.Row
 	Exec(ctx context.Context, query string, args ...interface{}) (pgconn.CommandTag, error)
+	SendBatch(ctx context.Context, batch *pgx.Batch) pgx.BatchResults
 	Transactional(ctx context.Context, fn func(ctx context.Context) error) (out error)
 }
 
@@ -108,4 +111,19 @@ func (s *Hive) Transactional(ctx context.Context, fn func(ctx context.Context) e
 		return err
 	}
 	return shard.Transactional(ctx, fn)
+}
+
+// SendBatch sends the entire batch to the transaction in ctx or to one selected shard.
+func (s *Hive) SendBatch(ctx context.Context, batch *pgx.Batch) pgx.BatchResults {
+	if tx, ok := pgcontext.TransactionFrom(ctx); ok {
+		return tx.SendBatch(ctx, batch)
+	}
+	shardID, err := s.pickShardID(ctx)
+	if err != nil {
+		return batchresults.Failed(err)
+	}
+	if shardID >= uint(len(s.shards)) {
+		return batchresults.Failed(fmt.Errorf("shard ID %d out of range: %w", shardID, ErrCouldNotPickShard))
+	}
+	return s.shards[shardID].SendBatch(ctx, batch)
 }
