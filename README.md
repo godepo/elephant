@@ -422,14 +422,26 @@ This annotation using before transactional method call or before any method of r
 transaction - all queries executed with their context database node. 
 
 
-### sqlc and batches
+### Batches
 
-Use `sql_package: pgx/v5` in sqlc and pass an elephant database to the
-generated package's `New(db)`. Elephant supports sqlc's `:batchexec`,
-`:batchmany`, and `:batchone` annotations through the native pgx API:
+Elephant databases expose the native pgx batch API:
 
 ```go
 SendBatch(ctx context.Context, batch *pgx.Batch) pgx.BatchResults
+```
+
+```go
+batch := &pgx.Batch{}
+batch.Queue("INSERT INTO users (id, name) VALUES ($1, $2)", id, name)
+batch.Queue("SELECT count(*) FROM users")
+
+results := db.SendBatch(elephant.WithCanWrite(ctx), batch)
+_, execErr := results.Exec()
+var count int64
+scanErr := results.QueryRow().Scan(&count)
+if err := errors.Join(execErr, scanErr, results.Close()); err != nil {
+	return err
+}
 ```
 
 A batch uses one transaction or database connection for all queued queries.
@@ -442,9 +454,7 @@ batches for different shards.
 Always close batch results before using the connection again or leaving a
 `Transactional` callback. `Close` drains unread results, runs queued pgx callbacks,
 and releases the connection; it is safe to call repeatedly. Check its error as
-well as errors returned while reading results. sqlc's result-reading methods
-close the underlying batch automatically, but their deferred close does not
-return its error; call the generated result's `Close` to check that error.
+well as errors returned while reading results.
 
 The metrics wrapper counts a batch as **one operation**, from `SendBatch` until
 `Close`, and retains the first error observed while reading results or closing.
@@ -454,18 +464,10 @@ individual result's rows leaves the batch's timeout active; closing the batch
 cancels its derived context after draining the results. A shorter parent deadline
 still takes precedence.
 
-To keep elephant's metrics and context handling in a transaction, retain
-`New(db)` and pass the context supplied by `db.Transactional` to sqlc methods.
-sqlc's `WithTx(tx)` also works with the `pgx.Tx` returned by elephant, but sends
-queries directly through that transaction instead of elephant's wrappers.
-`CopyFrom` / sqlc's `:copyfrom` annotation is not supported by these wrappers.
-
-The compatibility fixture in `internal/sqlcbatch` is a separate Go module, so the
-root module's `go generate`, tests, and linters skip it. It is generated with sqlc
-v1.30.0. To regenerate it and run its tests (Docker is required):
-
-```shell
-cd internal/sqlcbatch
-go generate ./...
-go test ./...
-```
+Because elephant databases implement the pgx methods, they also satisfy the `DBTX`
+interface that sqlc generates with `sql_package: pgx/v5`, including the `:batchexec`,
+`:batchmany`, and `:batchone` annotations. Pass the context supplied by
+`db.Transactional` to the generated methods to keep elephant's routing and metrics
+in a transaction. The generated result-reading methods close the batch in a deferred
+call that drops its error; call the generated result's `Close` to check it.
+`CopyFrom` (sqlc's `:copyfrom`) is not supported.

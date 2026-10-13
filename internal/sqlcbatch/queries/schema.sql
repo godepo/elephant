@@ -1,1 +1,0 @@
--- This fixture only queries PostgreSQL built-ins and needs no schema.
