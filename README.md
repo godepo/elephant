@@ -422,12 +422,13 @@ This annotation using before transactional method call or before any method of r
 transaction - all queries executed with their context database node. 
 
 
-### Batches
+### Batches and CopyFrom
 
-Elephant databases expose the native pgx batch API:
+Elephant databases expose the native pgx batch and copy API:
 
 ```go
 SendBatch(ctx context.Context, batch *pgx.Batch) pgx.BatchResults
+CopyFrom(ctx context.Context, tableName pgx.Identifier, columnNames []string, rowSrc pgx.CopyFromSource) (int64, error)
 ```
 
 ```go
@@ -464,10 +465,24 @@ individual result's rows leaves the batch's timeout active; closing the batch
 cancels its derived context after draining the results. A shorter parent deadline
 still takes precedence.
 
+`CopyFrom` is routed like `Exec`: the transaction stored in the context takes
+precedence, cluster routing sends it to the leader only with `WithCanWrite` (without
+it, the copy goes to a read-only follower and fails), and sharded routing selects one
+shard by the shard ID or sharding key in the context. The metrics wrapper counts a
+copy as one operation, and `WithTimeout` covers reading the source and sending all
+rows. When the source returns an error, pgx aborts the copy and returns the server's
+`*pgconn.PgError` (SQLSTATE 57014) with the source error's message, so check it with
+`errors.As` rather than `errors.Is`.
+
+```go
+rows := [][]any{{id1, name1}, {id2, name2}}
+copied, err := db.CopyFrom(elephant.WithCanWrite(ctx),
+	pgx.Identifier{"users"}, []string{"id", "name"}, pgx.CopyFromRows(rows))
+```
+
 Because elephant databases implement the pgx methods, they also satisfy the `DBTX`
 interface that sqlc generates with `sql_package: pgx/v5`, including the `:batchexec`,
-`:batchmany`, and `:batchone` annotations. Pass the context supplied by
+`:batchmany`, `:batchone`, and `:copyfrom` annotations. Pass the context supplied by
 `db.Transactional` to the generated methods to keep elephant's routing and metrics
 in a transaction. The generated result-reading methods close the batch in a deferred
 call that drops its error; call the generated result's `Close` to check it.
-`CopyFrom` (sqlc's `:copyfrom`) is not supported.
