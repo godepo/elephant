@@ -18,6 +18,7 @@ type Pool interface {
 	QueryRow(ctx context.Context, query string, args ...interface{}) pgx.Row
 	Exec(ctx context.Context, query string, args ...interface{}) (pgconn.CommandTag, error)
 	SendBatch(ctx context.Context, batch *pgx.Batch) pgx.BatchResults
+	CopyFrom(ctx context.Context, tableName pgx.Identifier, columnNames []string, rowSrc pgx.CopyFromSource) (int64, error)
 }
 
 type DB interface {
@@ -26,6 +27,7 @@ type DB interface {
 	QueryRow(ctx context.Context, query string, args ...interface{}) pgx.Row
 	Exec(ctx context.Context, query string, args ...interface{}) (pgconn.CommandTag, error)
 	SendBatch(ctx context.Context, batch *pgx.Batch) pgx.BatchResults
+	CopyFrom(ctx context.Context, tableName pgx.Identifier, columnNames []string, rowSrc pgx.CopyFromSource) (int64, error)
 }
 
 type Instance struct {
@@ -149,4 +151,15 @@ func (ins *Instance) Transactional(ctx context.Context, fn func(ctx context.Cont
 // SendBatch sends all queued queries through the transaction in ctx, when present.
 func (ins *Instance) SendBatch(ctx context.Context, batch *pgx.Batch) pgx.BatchResults {
 	return ins.selector(ctx).SendBatch(ctx, batch)
+}
+
+// CopyFrom copies rows through the transaction in ctx, when present.
+func (ins *Instance) CopyFrom(
+	ctx context.Context, tableName pgx.Identifier, columnNames []string, rowSrc pgx.CopyFromSource,
+) (int64, error) {
+	rows, err := ins.selector(ctx).CopyFrom(ctx, tableName, columnNames, rowSrc)
+	if err != nil {
+		return 0, fmt.Errorf("can't copy rows to regular instance: %w", err)
+	}
+	return rows, nil
 }
