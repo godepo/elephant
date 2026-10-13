@@ -20,6 +20,7 @@ type Pool interface {
 	QueryRow(ctx context.Context, query string, args ...interface{}) pgx.Row
 	Exec(ctx context.Context, query string, args ...interface{}) (pgconn.CommandTag, error)
 	SendBatch(ctx context.Context, batch *pgx.Batch) pgx.BatchResults
+	CopyFrom(ctx context.Context, tableName pgx.Identifier, columnNames []string, rowSrc pgx.CopyFromSource) (int64, error)
 	Transactional(ctx context.Context, fn func(ctx context.Context) error) (out error)
 }
 
@@ -111,4 +112,15 @@ func (s *Hive) SendBatch(ctx context.Context, batch *pgx.Batch) pgx.BatchResults
 		return failed.BatchResults(err)
 	}
 	return shard.SendBatch(ctx, batch)
+}
+
+// CopyFrom copies rows to one selected shard, which uses the transaction in ctx when present.
+func (s *Hive) CopyFrom(
+	ctx context.Context, tableName pgx.Identifier, columnNames []string, rowSrc pgx.CopyFromSource,
+) (int64, error) {
+	shard, err := s.getShard(ctx)
+	if err != nil {
+		return 0, err
+	}
+	return shard.CopyFrom(ctx, tableName, columnNames, rowSrc)
 }
