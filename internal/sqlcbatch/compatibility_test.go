@@ -8,9 +8,9 @@ import (
 
 	"github.com/godepo/elephant"
 	"github.com/godepo/elephant/clusterpg"
+	"github.com/godepo/elephant/internal/sharded"
 	"github.com/godepo/elephant/internal/sqlcbatch"
 	"github.com/godepo/elephant/metrics"
-	"github.com/godepo/elephant/shardedpg"
 	"github.com/godepo/elephant/singlepg"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -22,7 +22,7 @@ import (
 var (
 	_ sqlcbatch.DBTX = (singlepg.DB)(nil)
 	_ sqlcbatch.DBTX = (clusterpg.Pool)(nil)
-	_ sqlcbatch.DBTX = (shardedpg.Pool)(nil)
+	_ sqlcbatch.DBTX = (*sharded.Hive)(nil)
 	_ sqlcbatch.DBTX = (*pgxpool.Pool)(nil)
 )
 

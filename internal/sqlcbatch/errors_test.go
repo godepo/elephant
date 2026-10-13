@@ -5,7 +5,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/godepo/elephant/internal/pkg/batchresults"
+	"github.com/godepo/elephant/internal/pkg/failed"
 	"github.com/godepo/elephant/internal/sqlcbatch"
 	"github.com/jackc/pgx/v5"
 	"github.com/stretchr/testify/require"
@@ -37,7 +37,7 @@ func (b scanErrorBatch) Close() error             { return nil }
 
 func TestGeneratedBatchErrorHandling(t *testing.T) {
 	failure := errors.New("dispatch failed")
-	queries := sqlcbatch.New(errorDB{results: batchresults.Failed(failure)})
+	queries := sqlcbatch.New(errorDB{results: failed.BatchResults(failure)})
 	ctx := context.Background()
 	t.Run("exec", func(t *testing.T) {
 		result := queries.ExecuteValues(ctx, []int32{1})
@@ -80,7 +80,7 @@ func TestGeneratedBatchErrorHandling(t *testing.T) {
 
 func TestGeneratedBatchEarlyClose(t *testing.T) {
 	ctx := context.Background()
-	queries := sqlcbatch.New(errorDB{results: batchresults.Failed(context.Canceled)})
+	queries := sqlcbatch.New(errorDB{results: failed.BatchResults(context.Canceled)})
 	t.Run("exec", func(t *testing.T) {
 		result := queries.ExecuteValues(ctx, []int32{1})
 		require.ErrorIs(t, result.Close(), context.Canceled)

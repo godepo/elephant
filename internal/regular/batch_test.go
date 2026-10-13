@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/godepo/elephant/internal/pkg/batchresults"
+	"github.com/godepo/elephant/internal/pkg/failed"
 	"github.com/godepo/elephant/internal/pkg/pgcontext"
 	"github.com/jackc/pgx/v5"
 	"github.com/stretchr/testify/require"
@@ -16,7 +16,7 @@ func TestSendBatchRouting(t *testing.T) {
 			pool, tx := NewMockPool(t), NewMockTx(t)
 			ctx := context.Background()
 			batch := &pgx.Batch{}
-			expected := batchresults.Failed(context.Canceled)
+			expected := failed.BatchResults(context.Canceled)
 			if transaction {
 				ctx = pgcontext.With(ctx, pgcontext.WithTransaction(tx))
 				tx.EXPECT().SendBatch(ctx, batch).Return(expected).Once()

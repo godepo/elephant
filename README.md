@@ -435,8 +435,9 @@ SendBatch(ctx context.Context, batch *pgx.Batch) pgx.BatchResults
 A batch uses one transaction or database connection for all queued queries.
 The transaction stored in the context takes precedence. Cluster routing applies
 `WithCanWrite` to the entire batch; set it for batches containing writes.
-Sharded routing selects one shard for the entire batch, so use separate batches
-for different shards.
+Sharded routing selects one shard for the entire batch by the shard ID or sharding
+key in the context, inside a transaction as well, like other methods. Use separate
+batches for different shards.
 
 Always close batch results before using the connection again or leaving a
 `Transactional` callback. `Close` drains unread results, runs queued pgx callbacks,
@@ -447,6 +448,7 @@ return its error; call the generated result's `Close` to check that error.
 
 The metrics wrapper counts a batch as **one operation**, from `SendBatch` until
 `Close`, and retains the first error observed while reading results or closing.
+A later error replaces `pgx.ErrNoRows`, so a missing row does not hide a failed query.
 `WithTimeout` applies to sending and reading the entire batch. Closing an
 individual result's rows leaves the batch's timeout active; closing the batch
 cancels its derived context after draining the results. A shorter parent deadline
@@ -458,5 +460,12 @@ sqlc's `WithTx(tx)` also works with the `pgx.Tx` returned by elephant, but sends
 queries directly through that transaction instead of elephant's wrappers.
 `CopyFrom` / sqlc's `:copyfrom` annotation is not supported by these wrappers.
 
-The compatibility fixture in `internal/sqlcbatch` is generated with sqlc
-v1.30.0 and can be regenerated with `go generate ./internal/sqlcbatch`.
+The compatibility fixture in `internal/sqlcbatch` is a separate Go module, so the
+root module's `go generate`, tests, and linters skip it. It is generated with sqlc
+v1.30.0. To regenerate it and run its tests (Docker is required):
+
+```shell
+cd internal/sqlcbatch
+go generate ./...
+go test ./...
+```

@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/godepo/elephant/internal/pkg/batchresults"
+	"github.com/godepo/elephant/internal/pkg/failed"
 	"github.com/godepo/elephant/internal/pkg/pgcontext"
 	"github.com/jackc/pgx/v5"
 	"github.com/stretchr/testify/require"
@@ -19,7 +19,7 @@ func TestSendBatchRouting(t *testing.T) {
 			batch := &pgx.Batch{}
 			batch.Queue("SELECT 1")
 			batch.Queue("SELECT 2")
-			expected := batchresults.Failed(context.Canceled)
+			expected := failed.BatchResults(context.Canceled)
 			switch route {
 			case "leader":
 				ctx = pgcontext.WithCanWrite(ctx)

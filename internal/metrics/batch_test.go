@@ -194,3 +194,37 @@ func TestBatchParentDeadlineTakesPrecedence(t *testing.T) {
 	require.NoError(t, New(pool, collector).SendBatch(ctx, batch).Close())
 	require.NoError(t, parent.Err(), "batch Close must not cancel the parent")
 }
+
+func TestBatchMetricsRealErrorReplacesNoRows(t *testing.T) {
+	failure := errors.New("batch failure")
+	for _, order := range []string{"no rows only", "no rows then failure", "failure then no rows"} {
+		t.Run(order, func(t *testing.T) {
+			pool, collector := NewMockPool(t), &batchCollector{}
+			row := NewMockRow(t)
+			row.EXPECT().Scan(mock.Anything).Return(pgx.ErrNoRows).Once()
+			stub := &batchStub{row: row, execErr: failure}
+			batch := &pgx.Batch{}
+			pool.EXPECT().SendBatch(mock.Anything, batch).Return(stub).Once()
+			results := New(pool, collector).SendBatch(context.Background(), batch)
+			var value int
+			switch order {
+			case "no rows only":
+				require.ErrorIs(t, results.QueryRow().Scan(&value), pgx.ErrNoRows)
+			case "no rows then failure":
+				require.ErrorIs(t, results.QueryRow().Scan(&value), pgx.ErrNoRows)
+				_, err := results.Exec()
+				require.ErrorIs(t, err, failure)
+			case "failure then no rows":
+				_, err := results.Exec()
+				require.ErrorIs(t, err, failure)
+				require.ErrorIs(t, results.QueryRow().Scan(&value), pgx.ErrNoRows)
+			}
+			require.NoError(t, results.Close())
+			if order == "no rows only" {
+				require.ErrorIs(t, collector.err, pgx.ErrNoRows)
+			} else {
+				require.ErrorIs(t, collector.err, failure)
+			}
+		})
+	}
+}
