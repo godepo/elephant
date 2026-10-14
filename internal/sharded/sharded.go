@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 
+	"github.com/godepo/elephant/internal/pkg/failed"
 	"github.com/godepo/elephant/internal/pkg/pgcontext"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -12,20 +13,14 @@ import (
 
 var ErrCouldNotPickShard = errors.New("could not get shardID or shardingKey from context")
 
-type failedRow struct {
-	err error
-}
-
-func (r failedRow) Scan(_ ...any) error {
-	return r.err
-}
-
 type Pool interface {
 	BeginTx(ctx context.Context, opts pgx.TxOptions) (pgx.Tx, error)
 	Begin(ctx context.Context) (pgx.Tx, error)
 	Query(ctx context.Context, query string, args ...interface{}) (pgx.Rows, error)
 	QueryRow(ctx context.Context, query string, args ...interface{}) pgx.Row
 	Exec(ctx context.Context, query string, args ...interface{}) (pgconn.CommandTag, error)
+	SendBatch(ctx context.Context, batch *pgx.Batch) pgx.BatchResults
+	CopyFrom(ctx context.Context, tableName pgx.Identifier, columnNames []string, rowSrc pgx.CopyFromSource) (int64, error)
 	Transactional(ctx context.Context, fn func(ctx context.Context) error) (out error)
 }
 
@@ -89,7 +84,7 @@ func (s *Hive) Query(ctx context.Context, query string, args ...interface{}) (pg
 func (s *Hive) QueryRow(ctx context.Context, query string, args ...interface{}) pgx.Row {
 	shard, err := s.getShard(ctx)
 	if err != nil {
-		return failedRow{err: err}
+		return failed.Row(err)
 	}
 	return shard.QueryRow(ctx, query, args...)
 }
@@ -108,4 +103,24 @@ func (s *Hive) Transactional(ctx context.Context, fn func(ctx context.Context) e
 		return err
 	}
 	return shard.Transactional(ctx, fn)
+}
+
+// SendBatch sends the entire batch to one selected shard, which uses the transaction in ctx when present.
+func (s *Hive) SendBatch(ctx context.Context, batch *pgx.Batch) pgx.BatchResults {
+	shard, err := s.getShard(ctx)
+	if err != nil {
+		return failed.BatchResults(err)
+	}
+	return shard.SendBatch(ctx, batch)
+}
+
+// CopyFrom copies rows to one selected shard, which uses the transaction in ctx when present.
+func (s *Hive) CopyFrom(
+	ctx context.Context, tableName pgx.Identifier, columnNames []string, rowSrc pgx.CopyFromSource,
+) (int64, error) {
+	shard, err := s.getShard(ctx)
+	if err != nil {
+		return 0, err
+	}
+	return shard.CopyFrom(ctx, tableName, columnNames, rowSrc)
 }

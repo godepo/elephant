@@ -421,3 +421,68 @@ at replica node.
 This annotation using before transactional method call or before any method of repository. But, when we have started 
 transaction - all queries executed with their context database node. 
 
+
+### Batches and CopyFrom
+
+Elephant databases expose the native pgx batch and copy API:
+
+```go
+SendBatch(ctx context.Context, batch *pgx.Batch) pgx.BatchResults
+CopyFrom(ctx context.Context, tableName pgx.Identifier, columnNames []string, rowSrc pgx.CopyFromSource) (int64, error)
+```
+
+```go
+batch := &pgx.Batch{}
+batch.Queue("INSERT INTO users (id, name) VALUES ($1, $2)", id, name)
+batch.Queue("SELECT count(*) FROM users")
+
+results := db.SendBatch(elephant.WithCanWrite(ctx), batch)
+_, execErr := results.Exec()
+var count int64
+scanErr := results.QueryRow().Scan(&count)
+if err := errors.Join(execErr, scanErr, results.Close()); err != nil {
+	return err
+}
+```
+
+A batch uses one transaction or database connection for all queued queries.
+The transaction stored in the context takes precedence. Cluster routing applies
+`WithCanWrite` to the entire batch; set it for batches containing writes.
+Sharded routing selects one shard for the entire batch by the shard ID or sharding
+key in the context, inside a transaction as well, like other methods. Use separate
+batches for different shards.
+
+Always close batch results before using the connection again or leaving a
+`Transactional` callback. `Close` drains unread results, runs queued pgx callbacks,
+and releases the connection; it is safe to call repeatedly. Check its error as
+well as errors returned while reading results.
+
+The metrics wrapper counts a batch as **one operation**, from `SendBatch` until
+`Close`, and retains the first error observed while reading results or closing.
+A later error replaces `pgx.ErrNoRows`, so a missing row does not hide a failed query.
+`WithTimeout` applies to sending and reading the entire batch. Closing an
+individual result's rows leaves the batch's timeout active; closing the batch
+cancels its derived context after draining the results. A shorter parent deadline
+still takes precedence.
+
+`CopyFrom` is routed like `Exec`: the transaction stored in the context takes
+precedence, cluster routing sends it to the leader only with `WithCanWrite` (without
+it, the copy goes to a read-only follower and fails), and sharded routing selects one
+shard by the shard ID or sharding key in the context. The metrics wrapper counts a
+copy as one operation, and `WithTimeout` covers reading the source and sending all
+rows. When the source returns an error, pgx aborts the copy and returns the server's
+`*pgconn.PgError` (SQLSTATE 57014) with the source error's message, so check it with
+`errors.As` rather than `errors.Is`.
+
+```go
+rows := [][]any{{id1, name1}, {id2, name2}}
+copied, err := db.CopyFrom(elephant.WithCanWrite(ctx),
+	pgx.Identifier{"users"}, []string{"id", "name"}, pgx.CopyFromRows(rows))
+```
+
+Because elephant databases implement the pgx methods, they also satisfy the `DBTX`
+interface that sqlc generates with `sql_package: pgx/v5`, including the `:batchexec`,
+`:batchmany`, `:batchone`, and `:copyfrom` annotations. Pass the context supplied by
+`db.Transactional` to the generated methods to keep elephant's routing and metrics
+in a transaction. The generated result-reading methods close the batch in a deferred
+call that drops its error; call the generated result's `Close` to check it.
