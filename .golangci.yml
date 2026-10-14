@@ -11,6 +11,7 @@ linters:
     - errname
     - exhaustive
     - exhaustruct
+    - exhaustruct_v5
     - forcetypeassert
     - ireturn
     - nlreturn
@@ -20,6 +21,11 @@ linters:
     - tagalign
     - tagliatelle
     - wsl
+    - wsl_v5
+    - funcorder
+    - noinlineerr
+    - embeddedstructfieldcheck
+    - modernize
   settings:
     lll:
       line-length: 120
