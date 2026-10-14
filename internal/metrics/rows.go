@@ -34,6 +34,14 @@ func newDecoratedRows(
 	}
 }
 
+func (rows decoratedMetricRows) Next() bool {
+	if rows.Rows.Next() {
+		return true
+	}
+	rows.Close()
+	return false
+}
+
 func (rows decoratedMetricRows) Close() {
 	rows.once.Do(rows.close)
 }

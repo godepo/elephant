@@ -82,6 +82,9 @@ func ShardingKeyFrom(ctx context.Context) (string, bool) {
 	return pgcontext.ShardingKeyFrom(ctx)
 }
 
+// WithTimeout limits Query, QueryRow, and Exec when using the metrics wrapper.
+// The timeout includes fetching results until rows are closed or exhausted, or Row.Scan returns.
+// Zero and negative durations expire immediately; an earlier context deadline takes precedence.
 func WithTimeout(timeout time.Duration) pgcontext.OptionContext {
 	return pgcontext.WithTimeout(timeout)
 }
