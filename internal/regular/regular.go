@@ -17,6 +17,7 @@ type Pool interface {
 	Query(ctx context.Context, query string, args ...interface{}) (pgx.Rows, error)
 	QueryRow(ctx context.Context, query string, args ...interface{}) pgx.Row
 	Exec(ctx context.Context, query string, args ...interface{}) (pgconn.CommandTag, error)
+	SendBatch(ctx context.Context, batch *pgx.Batch) pgx.BatchResults
 }
 
 type DB interface {
@@ -24,6 +25,7 @@ type DB interface {
 	Query(ctx context.Context, query string, args ...interface{}) (pgx.Rows, error)
 	QueryRow(ctx context.Context, query string, args ...interface{}) pgx.Row
 	Exec(ctx context.Context, query string, args ...interface{}) (pgconn.CommandTag, error)
+	SendBatch(ctx context.Context, batch *pgx.Batch) pgx.BatchResults
 }
 
 type Instance struct {
@@ -142,4 +144,9 @@ func (ins *Instance) Transactional(ctx context.Context, fn func(ctx context.Cont
 		return fmt.Errorf("can't run transaction regular instance: %w", err)
 	}
 	return out
+}
+
+// SendBatch sends all queued queries through the transaction in ctx, when present.
+func (ins *Instance) SendBatch(ctx context.Context, batch *pgx.Batch) pgx.BatchResults {
+	return ins.selector(ctx).SendBatch(ctx, batch)
 }

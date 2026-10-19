@@ -15,6 +15,7 @@ type Pool interface {
 	Query(ctx context.Context, query string, args ...interface{}) (pgx.Rows, error)
 	QueryRow(ctx context.Context, query string, args ...interface{}) pgx.Row
 	Exec(ctx context.Context, query string, args ...interface{}) (pgconn.CommandTag, error)
+	SendBatch(ctx context.Context, batch *pgx.Batch) pgx.BatchResults
 	Transactional(ctx context.Context, fn func(ctx context.Context) error) (out error)
 }
 
@@ -22,6 +23,7 @@ type DB interface {
 	Query(ctx context.Context, query string, args ...interface{}) (pgx.Rows, error)
 	QueryRow(ctx context.Context, query string, args ...interface{}) pgx.Row
 	Exec(ctx context.Context, query string, args ...interface{}) (pgconn.CommandTag, error)
+	SendBatch(ctx context.Context, batch *pgx.Batch) pgx.BatchResults
 }
 
 type LoadBalancer func(fellows []Pool) Pool
@@ -104,4 +106,9 @@ func (cls *Cluster) Transactional(ctx context.Context, fn func(ctx context.Conte
 		return cls.leader.Transactional(ctx, fn)
 	}
 	return cls.cfg.loadBalancer(cls.fellows).Transactional(ctx, fn)
+}
+
+// SendBatch selects one connection for the entire batch. Write batches require WithCanWrite.
+func (cls *Cluster) SendBatch(ctx context.Context, batch *pgx.Batch) pgx.BatchResults {
+	return cls.selector(ctx).SendBatch(ctx, batch)
 }
