@@ -11,46 +11,81 @@ import (
 )
 
 func TestSendBatchRouting(t *testing.T) {
-	for _, route := range []string{"id", "key", "transaction"} {
-		t.Run(route, func(t *testing.T) {
-			pool := NewMockPool(t)
-			ctx := context.Background()
-			batch := &pgx.Batch{}
-			expected := failed.BatchResults(context.Canceled)
-			db := New([]Pool{pool}, func(_ context.Context, key string) uint { require.Equal(t, "key", key); return 0 })
-			switch route {
-			case "id":
-				ctx = pgcontext.With(ctx, pgcontext.WithShardID(0))
-			case "key":
-				ctx = pgcontext.With(ctx, pgcontext.WithShardingKey("key"))
-			case "transaction":
-				// The selected shard resolves the transaction from ctx, as for other methods.
-				ctx = pgcontext.With(ctx, pgcontext.WithShardID(0), pgcontext.WithTransaction(NewMockTx(t)))
-			}
-			pool.EXPECT().SendBatch(ctx, batch).Return(expected).Once()
-			require.Equal(t, expected, db.SendBatch(ctx, batch))
+	t.Run("should be able to send a batch to the shard selected by ID", func(t *testing.T) {
+		other, selected := NewMockPool(t), NewMockPool(t)
+		db := New([]Pool{other, selected}, nil)
+		ctx := pgcontext.With(context.Background(), pgcontext.WithShardID(1))
+		batch := &pgx.Batch{}
+		batch.Queue("SELECT 1")
+		batch.Queue("SELECT 2")
+		expected := failed.BatchResults(context.Canceled)
+		selected.EXPECT().SendBatch(ctx, batch).Return(expected).Once()
+
+		require.Equal(t, expected, db.SendBatch(ctx, batch))
+	})
+
+	t.Run("should be able to send a batch to the shard selected by key", func(t *testing.T) {
+		other, selected := NewMockPool(t), NewMockPool(t)
+		ctx := pgcontext.With(context.Background(), pgcontext.WithShardingKey("key"))
+		db := New([]Pool{other, selected}, func(actual context.Context, key string) uint {
+			require.Equal(t, ctx, actual)
+			require.Equal(t, "key", key)
+			return 1
 		})
-	}
+		batch := &pgx.Batch{}
+		batch.Queue("SELECT 1")
+		batch.Queue("SELECT 2")
+		expected := failed.BatchResults(context.Canceled)
+		selected.EXPECT().SendBatch(ctx, batch).Return(expected).Once()
+
+		require.Equal(t, expected, db.SendBatch(ctx, batch))
+	})
+
+	t.Run("should be able to pass the transaction context to the selected shard", func(t *testing.T) {
+		other, selected := NewMockPool(t), NewMockPool(t)
+		db := New([]Pool{other, selected}, nil)
+		ctx := pgcontext.With(context.Background(), pgcontext.WithShardID(1), pgcontext.WithTransaction(NewMockTx(t)))
+		batch := &pgx.Batch{}
+		batch.Queue("SELECT 1")
+		batch.Queue("SELECT 2")
+		expected := failed.BatchResults(context.Canceled)
+		selected.EXPECT().SendBatch(ctx, batch).Return(expected).Once()
+
+		require.Equal(t, expected, db.SendBatch(ctx, batch))
+	})
 }
 
 func TestSendBatchCouldNotPickShard(t *testing.T) {
-	for _, name := range []string{"empty context", "transaction without shard"} {
-		t.Run(name, func(t *testing.T) {
-			ctx := context.Background()
-			if name == "transaction without shard" {
-				ctx = pgcontext.With(ctx, pgcontext.WithTransaction(NewMockTx(t)))
-			}
-			results := New([]Pool{NewMockPool(t)}, nil).SendBatch(ctx, &pgx.Batch{})
-			_, err := results.Exec()
-			require.ErrorIs(t, err, ErrCouldNotPickShard)
-			rows, err := results.Query()
-			require.ErrorIs(t, err, ErrCouldNotPickShard)
-			require.ErrorIs(t, rows.Err(), ErrCouldNotPickShard)
-			require.ErrorIs(t, results.QueryRow().Scan(), ErrCouldNotPickShard)
-			require.ErrorIs(t, results.Close(), ErrCouldNotPickShard)
-			require.ErrorIs(t, results.Close(), ErrCouldNotPickShard)
-		})
-	}
+	t.Run("should be able to report a missing shard through every batch result method", func(t *testing.T) {
+		db := New([]Pool{NewMockPool(t)}, nil)
+
+		results := db.SendBatch(context.Background(), &pgx.Batch{})
+		_, err := results.Exec()
+		require.ErrorIs(t, err, ErrCouldNotPickShard)
+		rows, err := results.Query()
+		require.ErrorIs(t, err, ErrCouldNotPickShard)
+		require.NotNil(t, rows)
+		require.ErrorIs(t, rows.Err(), ErrCouldNotPickShard)
+		require.ErrorIs(t, results.QueryRow().Scan(), ErrCouldNotPickShard)
+		require.ErrorIs(t, results.Close(), ErrCouldNotPickShard)
+		require.ErrorIs(t, results.Close(), ErrCouldNotPickShard)
+	})
+
+	t.Run("should be able to report a missing shard even when a transaction is in context", func(t *testing.T) {
+		db := New([]Pool{NewMockPool(t)}, nil)
+		ctx := pgcontext.With(context.Background(), pgcontext.WithTransaction(NewMockTx(t)))
+
+		results := db.SendBatch(ctx, &pgx.Batch{})
+		_, err := results.Exec()
+		require.ErrorIs(t, err, ErrCouldNotPickShard)
+		rows, err := results.Query()
+		require.ErrorIs(t, err, ErrCouldNotPickShard)
+		require.NotNil(t, rows)
+		require.ErrorIs(t, rows.Err(), ErrCouldNotPickShard)
+		require.ErrorIs(t, results.QueryRow().Scan(), ErrCouldNotPickShard)
+		require.ErrorIs(t, results.Close(), ErrCouldNotPickShard)
+		require.ErrorIs(t, results.Close(), ErrCouldNotPickShard)
+	})
 }
 
 func TestSendBatchShardOutOfRangePanics(t *testing.T) {
