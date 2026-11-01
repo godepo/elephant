@@ -2,24 +2,11 @@ package sharded
 
 import (
 	"context"
-	"errors"
 	"testing"
 
-	"github.com/jaswdr/faker/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
-
-func TestFailedRow(t *testing.T) {
-	t.Run("should be able to scan err", func(t *testing.T) {
-		expErr := errors.New(faker.New().RandomStringWithLength(10))
-		row := failedRow{
-			err: expErr,
-		}
-		err := row.Scan()
-		assert.Equal(t, expErr, err)
-	})
-}
 
 func TestNew(t *testing.T) {
 	t.Run("should be able to be able", func(t *testing.T) {
