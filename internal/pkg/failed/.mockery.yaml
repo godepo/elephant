@@ -1,0 +1,12 @@
+filename: "mock_{{.InterfaceName}}_test.go"
+dir: ./
+structname: Mock{{.InterfaceName}}
+pkgname: failed
+template: testify
+force-file-write: true
+packages:
+  github.com/jackc/pgx/v5:
+    config:
+      all: false
+    interfaces:
+      Tx: { }
