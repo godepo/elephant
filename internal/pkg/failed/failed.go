@@ -2,16 +2,43 @@
 package failed
 
 import (
+	"context"
+
+	"github.com/godepo/elephant/internal/pkg/pgcontext"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
-type batchResults struct{ err error }
+type batchResults struct {
+	ctx context.Context
+	err error
+}
+
+func (b batchResults) Tx() pgx.Tx {
+	tx, ok := pgcontext.TransactionFrom(b.ctx)
+	if !ok {
+		return nil
+	}
+
+	return tx
+}
+
 type rows struct{ err error }
+
+func (r rows) TypeMap() *pgtype.Map {
+	return nil
+}
+
 type row struct{ err error }
 
 // BatchResults returns batch results that consistently report err without holding a connection.
-func BatchResults(err error) pgx.BatchResults { return batchResults{err: err} }
+func BatchResults(ctx context.Context, err error) pgx.BatchResults {
+	return batchResults{
+		err: err,
+		ctx: ctx,
+	}
+}
 
 // Rows returns closed rows that report err.
 func Rows(err error) pgx.Rows { return rows{err: err} }

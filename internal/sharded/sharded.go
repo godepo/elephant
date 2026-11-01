@@ -108,7 +108,7 @@ func (s *Hive) Transactional(ctx context.Context, fn func(ctx context.Context) e
 func (s *Hive) SendBatch(ctx context.Context, batch *pgx.Batch) pgx.BatchResults {
 	shard, err := s.getShard(ctx)
 	if err != nil {
-		return failed.BatchResults(err)
+		return failed.BatchResults(ctx, err)
 	}
 	return shard.SendBatch(ctx, batch)
 }

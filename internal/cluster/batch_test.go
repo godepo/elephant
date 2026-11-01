@@ -18,7 +18,7 @@ func TestSendBatchRouting(t *testing.T) {
 		batch := &pgx.Batch{}
 		batch.Queue("SELECT 1")
 		batch.Queue("SELECT 2")
-		expected := failed.BatchResults(context.Canceled)
+		expected := failed.BatchResults(ctx, context.Canceled)
 		follower.EXPECT().SendBatch(ctx, batch).Return(expected).Once()
 
 		require.Equal(t, expected, db.SendBatch(ctx, batch))
@@ -31,7 +31,7 @@ func TestSendBatchRouting(t *testing.T) {
 		batch := &pgx.Batch{}
 		batch.Queue("INSERT INTO numbers (value) VALUES ($1)", 1)
 		batch.Queue("SELECT value FROM numbers")
-		expected := failed.BatchResults(context.Canceled)
+		expected := failed.BatchResults(ctx, context.Canceled)
 		leader.EXPECT().SendBatch(ctx, batch).Return(expected).Once()
 
 		require.Equal(t, expected, db.SendBatch(ctx, batch))
@@ -44,7 +44,7 @@ func TestSendBatchRouting(t *testing.T) {
 		batch := &pgx.Batch{}
 		batch.Queue("SELECT 1")
 		batch.Queue("SELECT 2")
-		expected := failed.BatchResults(context.Canceled)
+		expected := failed.BatchResults(ctx, context.Canceled)
 		tx.EXPECT().SendBatch(ctx, batch).Return(expected).Once()
 
 		require.Equal(t, expected, db.SendBatch(ctx, batch))
