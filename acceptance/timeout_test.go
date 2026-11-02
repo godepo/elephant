@@ -3,6 +3,7 @@ package acceptance
 import (
 	"context"
 	"github.com/godepo/elephant"
+	"github.com/jackc/pgx/v5"
 	"github.com/stretchr/testify/require"
 	"testing"
 	"time"
@@ -30,7 +31,7 @@ func TestQueryTimeout(t *testing.T) {
 		defer cancel()
 		ctx := elephant.With(parent, elephant.WithTimeout(50*time.Millisecond))
 		rows, err := tcs.SUT.Query(ctx, "SELECT pg_sleep(1)")
-		require.Nil(t, rows)
+		err = queryTimeoutError(rows, err)
 		require.ErrorIs(t, err, context.DeadlineExceeded)
 		require.NoError(t, parent.Err())
 		require.Equal(t, 1, tcs.Deps.Collector.calls)
@@ -55,4 +56,13 @@ func TestQueryTimeout(t *testing.T) {
 		require.NoError(t, tcs.SUT.QueryRow(parent, "SELECT 1").Scan(&value))
 		require.Equal(t, 1, value)
 	})
+}
+
+// Query can surface a deadline either during dispatch or while reading results.
+func queryTimeoutError(rows pgx.Rows, err error) error {
+	if err != nil {
+		return err
+	}
+	_, err = pgx.CollectRows(rows, func(pgx.CollectableRow) (int, error) { return 0, nil })
+	return err
 }
