@@ -6,28 +6,70 @@ import (
 	"testing"
 
 	"github.com/godepo/elephant/internal/pkg/pgcontext"
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
 
-func TestCopyFromRouting(t *testing.T) {
-	for _, transaction := range []bool{false, true} {
-		t.Run(map[bool]string{false: "pool", true: "transaction"}[transaction], func(t *testing.T) {
-			pool, tx := NewMockPool(t), NewMockTx(t)
-			ctx := context.Background()
-			table, columns, source := pgx.Identifier{"values"}, []string{"value"}, pgx.CopyFromRows([][]any{{1}})
-			if transaction {
-				ctx = pgcontext.With(ctx, pgcontext.WithTransaction(tx))
-				tx.EXPECT().CopyFrom(ctx, table, columns, source).Return(1, nil).Once()
-			} else {
-				pool.EXPECT().CopyFrom(ctx, table, columns, source).Return(1, nil).Once()
-			}
-			copied, err := New(pool).CopyFrom(ctx, table, columns, source)
-			require.NoError(t, err)
-			require.EqualValues(t, 1, copied)
-		})
-	}
+func TestInstance_CopyFrom(t *testing.T) {
+	t.Run("should copy rows through the pool", func(t *testing.T) {
+		tcs := suite.Case(t)
+		ctx := context.Background()
+		record := Record{ID: uuid.New(), Value: "copy through pool"}
+		copied, err := tcs.SUT.CopyFrom(ctx, pgx.Identifier{"regular", "instance"}, []string{"id", "value"},
+			pgx.CopyFromRows([][]any{{record.ID, record.Value}}))
+		require.NoError(t, err)
+		require.EqualValues(t, 1, copied)
+		var actual string
+		require.NoError(t, tcs.SUT.QueryRow(ctx,
+			"SELECT value FROM regular.instance WHERE id = $1", record.ID).Scan(&actual))
+		require.Equal(t, record.Value, actual)
+		require.NoError(t, tcs.Deps.DB.QueryRow(context.Background(),
+			"SELECT value FROM regular.instance WHERE id = $1", record.ID).Scan(&actual))
+		require.Equal(t, record.Value, actual)
+	})
+	t.Run("should copy rows through the committed transaction", func(t *testing.T) {
+		tcs := suite.Case(t)
+		ctx := context.Background()
+		record := Record{ID: uuid.New(), Value: "copy through committed transaction"}
+		tx, err := tcs.SUT.Begin(ctx)
+		require.NoError(t, err)
+		defer tx.Rollback(ctx)
+		ctx = pgcontext.With(ctx, pgcontext.WithTransaction(tx))
+		copied, err := tcs.SUT.CopyFrom(ctx, pgx.Identifier{"regular", "instance"}, []string{"id", "value"},
+			pgx.CopyFromRows([][]any{{record.ID, record.Value}}))
+		require.NoError(t, err)
+		require.EqualValues(t, 1, copied)
+		var actual string
+		require.NoError(t, tcs.SUT.QueryRow(ctx,
+			"SELECT value FROM regular.instance WHERE id = $1", record.ID).Scan(&actual))
+		require.Equal(t, record.Value, actual)
+		require.NoError(t, tx.Commit(context.Background()))
+		require.NoError(t, tcs.Deps.DB.QueryRow(context.Background(),
+			"SELECT value FROM regular.instance WHERE id = $1", record.ID).Scan(&actual))
+		require.Equal(t, record.Value, actual)
+	})
+	t.Run("should copy rows through the rolled back transaction", func(t *testing.T) {
+		tcs := suite.Case(t)
+		ctx := context.Background()
+		record := Record{ID: uuid.New(), Value: "copy through rolled back transaction"}
+		tx, err := tcs.SUT.Begin(ctx)
+		require.NoError(t, err)
+		defer tx.Rollback(ctx)
+		ctx = pgcontext.With(ctx, pgcontext.WithTransaction(tx))
+		copied, err := tcs.SUT.CopyFrom(ctx, pgx.Identifier{"regular", "instance"}, []string{"id", "value"},
+			pgx.CopyFromRows([][]any{{record.ID, record.Value}}))
+		require.NoError(t, err)
+		require.EqualValues(t, 1, copied)
+		var actual string
+		require.NoError(t, tcs.SUT.QueryRow(ctx,
+			"SELECT value FROM regular.instance WHERE id = $1", record.ID).Scan(&actual))
+		require.Equal(t, record.Value, actual)
+		require.NoError(t, tx.Rollback(context.Background()))
+		require.ErrorIs(t, tcs.Deps.DB.QueryRow(context.Background(),
+			"SELECT value FROM regular.instance WHERE id = $1", record.ID).Scan(&actual), pgx.ErrNoRows)
+	})
 }
 
 func TestCopyFromError(t *testing.T) {
