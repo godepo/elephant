@@ -109,10 +109,11 @@ func (m DB) QueryRow(ctx context.Context, query string, args ...interface{}) pgx
 	timeout, ok := pgcontext.QueryTimeoutFrom(ctx)
 	if ok {
 		cancelCtx, cancel := context.WithTimeout(ctx, timeout)
+		ctx = cancelCtx
 		row.ctx = cancelCtx
 		row.cancel = monads.OptionalOf(cancel)
 	}
-	row.row = m.db.QueryRow(row.ctx, query, args...)
+	row.row = m.db.QueryRow(ctx, query, args...)
 	return row
 }
 
