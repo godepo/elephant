@@ -471,9 +471,9 @@ it, the copy goes to a read-only follower and fails), and sharded routing select
 shard by the shard ID or sharding key in the context. The metrics wrapper counts a
 copy as one operation. `WithTimeout` interrupts the database COPY when its deadline
 expires, but `CopyFrom` returns only after the current source call finishes. A
-blocking source must observe the context itself. When the source returns an error, pgx aborts the copy and returns the server's
-`*pgconn.PgError` (SQLSTATE 57014) with the source error's message, so check it with
-`errors.As` rather than `errors.Is`.
+blocking source must observe the context itself. When the source returns an error,
+pgx aborts the copy and returns the server's `*pgconn.PgError` (SQLSTATE 57014) with
+the source error's message, so check it with `errors.As` rather than `errors.Is`.
 
 ```go
 rows := [][]any{{id1, name1}, {id2, name2}}
