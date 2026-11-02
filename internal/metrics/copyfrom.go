@@ -9,7 +9,8 @@ import (
 )
 
 // CopyFrom measures the entire copy as one operation.
-// The timeout is applied before the copy starts and covers reading rowSrc and sending all rows.
+// The timeout is applied before the copy starts and interrupts the database COPY.
+// CopyFrom still waits for the current source call to finish; blocking sources must observe ctx themselves.
 func (m DB) CopyFrom(
 	ctx context.Context, tableName pgx.Identifier, columnNames []string, rowSrc pgx.CopyFromSource,
 ) (int64, error) {

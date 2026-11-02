@@ -469,8 +469,9 @@ still takes precedence.
 precedence, cluster routing sends it to the leader only with `WithCanWrite` (without
 it, the copy goes to a read-only follower and fails), and sharded routing selects one
 shard by the shard ID or sharding key in the context. The metrics wrapper counts a
-copy as one operation, and `WithTimeout` covers reading the source and sending all
-rows. When the source returns an error, pgx aborts the copy and returns the server's
+copy as one operation. `WithTimeout` interrupts the database COPY when its deadline
+expires, but `CopyFrom` returns only after the current source call finishes. A
+blocking source must observe the context itself. When the source returns an error, pgx aborts the copy and returns the server's
 `*pgconn.PgError` (SQLSTATE 57014) with the source error's message, so check it with
 `errors.As` rather than `errors.Is`.
 
