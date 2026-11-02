@@ -2,11 +2,12 @@ package acceptance
 
 import (
 	"context"
+	"testing"
+	"time"
+
 	"github.com/godepo/elephant"
 	"github.com/jackc/pgx/v5"
 	"github.com/stretchr/testify/require"
-	"testing"
-	"time"
 )
 
 func TestQueryTimeout(t *testing.T) {
