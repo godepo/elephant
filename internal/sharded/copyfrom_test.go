@@ -10,43 +10,61 @@ import (
 )
 
 func TestCopyFromRouting(t *testing.T) {
-	for _, route := range []string{"id", "key", "transaction"} {
-		t.Run(route, func(t *testing.T) {
-			pool := NewMockPool(t)
-			ctx := context.Background()
-			table, columns, source := pgx.Identifier{"values"}, []string{"value"}, pgx.CopyFromRows([][]any{{1}})
-			db := New([]Pool{pool}, func(_ context.Context, key string) uint { require.Equal(t, "key", key); return 0 })
-			switch route {
-			case "id":
-				ctx = pgcontext.With(ctx, pgcontext.WithShardID(0))
-			case "key":
-				ctx = pgcontext.With(ctx, pgcontext.WithShardingKey("key"))
-			case "transaction":
-				// The selected shard resolves the transaction from ctx, as for other methods.
-				ctx = pgcontext.With(ctx, pgcontext.WithShardID(0), pgcontext.WithTransaction(NewMockTx(t)))
-			}
-			pool.EXPECT().CopyFrom(ctx, table, columns, source).Return(1, nil).Once()
-			copied, err := db.CopyFrom(ctx, table, columns, source)
-			require.NoError(t, err)
-			require.EqualValues(t, 1, copied)
+	t.Run("should be able to copy rows to the shard selected by ID", func(t *testing.T) {
+		other, selected := NewMockPool(t), NewMockPool(t)
+		db := New([]Pool{other, selected}, nil)
+		ctx := pgcontext.With(context.Background(), pgcontext.WithShardID(1))
+		table, columns, source := pgx.Identifier{"values"}, []string{"value"}, pgx.CopyFromRows([][]any{{1}})
+		selected.EXPECT().CopyFrom(ctx, table, columns, source).Return(1, nil).Once()
+
+		copied, err := db.CopyFrom(ctx, table, columns, source)
+		require.NoError(t, err)
+		require.EqualValues(t, 1, copied)
+	})
+
+	t.Run("should be able to copy rows to the shard selected by key", func(t *testing.T) {
+		other, selected := NewMockPool(t), NewMockPool(t)
+		ctx := pgcontext.With(context.Background(), pgcontext.WithShardingKey("key"))
+		db := New([]Pool{other, selected}, func(actual context.Context, key string) uint {
+			require.Equal(t, ctx, actual)
+			require.Equal(t, "key", key)
+			return 1
 		})
-	}
+		table, columns, source := pgx.Identifier{"values"}, []string{"value"}, pgx.CopyFromRows([][]any{{1}})
+		selected.EXPECT().CopyFrom(ctx, table, columns, source).Return(1, nil).Once()
+
+		copied, err := db.CopyFrom(ctx, table, columns, source)
+		require.NoError(t, err)
+		require.EqualValues(t, 1, copied)
+	})
+
+	t.Run("should be able to pass the transaction context to the selected shard", func(t *testing.T) {
+		other, selected := NewMockPool(t), NewMockPool(t)
+		db := New([]Pool{other, selected}, nil)
+		ctx := pgcontext.With(context.Background(), pgcontext.WithShardID(1), pgcontext.WithTransaction(NewMockTx(t)))
+		table, columns, source := pgx.Identifier{"values"}, []string{"value"}, pgx.CopyFromRows([][]any{{1}})
+		selected.EXPECT().CopyFrom(ctx, table, columns, source).Return(1, nil).Once()
+
+		copied, err := db.CopyFrom(ctx, table, columns, source)
+		require.NoError(t, err)
+		require.EqualValues(t, 1, copied)
+	})
 }
 
 func TestCopyFromCouldNotPickShard(t *testing.T) {
-	for _, name := range []string{"empty context", "transaction without shard"} {
-		t.Run(name, func(t *testing.T) {
-			ctx := context.Background()
-			if name == "transaction without shard" {
-				ctx = pgcontext.With(ctx, pgcontext.WithTransaction(NewMockTx(t)))
-			}
-			copied, err := New([]Pool{NewMockPool(t)}, nil).CopyFrom(ctx, pgx.Identifier{"values"}, nil, pgx.CopyFromRows(nil))
-			require.ErrorIs(t, err, ErrCouldNotPickShard)
-			require.Zero(t, copied)
-		})
-	}
+	t.Run("should report no shard selected", func(t *testing.T) {
+		ctx := pgcontext.With(context.Background())
+		copied, err := New([]Pool{NewMockPool(t)}, nil).CopyFrom(ctx, pgx.Identifier{"values"}, nil, pgx.CopyFromRows(nil))
+		require.ErrorIs(t, err, ErrCouldNotPickShard)
+		require.Zero(t, copied)
+	})
+	t.Run("should report transaction without a shard", func(t *testing.T) {
+		ctx := pgcontext.With(context.Background(), pgcontext.WithTransaction(NewMockTx(t)))
+		copied, err := New([]Pool{NewMockPool(t)}, nil).CopyFrom(ctx, pgx.Identifier{"values"}, nil, pgx.CopyFromRows(nil))
+		require.ErrorIs(t, err, ErrCouldNotPickShard)
+		require.Zero(t, copied)
+	})
 }
-
 func TestCopyFromShardOutOfRangePanics(t *testing.T) {
 	db := New([]Pool{NewMockPool(t)}, nil)
 	ctx := pgcontext.With(context.Background(), pgcontext.WithShardID(1))
