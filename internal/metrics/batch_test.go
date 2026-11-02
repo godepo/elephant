@@ -538,3 +538,61 @@ func TestBatchMetricsRealErrorReplacesNoRows(t *testing.T) {
 		require.ErrorIs(t, collector.err, failure)
 	})
 }
+
+func TestBatchZeroTimeoutExpiresBeforeDispatch(t *testing.T) {
+	pool, collector := NewMockPool(t), &batchCollector{}
+	ctx := pgcontext.With(context.Background(), pgcontext.WithTimeout(0))
+	batch := &pgx.Batch{}
+	stub := &batchStub{closeErr: context.DeadlineExceeded}
+	pool.EXPECT().SendBatch(mock.Anything, batch).RunAndReturn(func(sent context.Context, _ *pgx.Batch) pgx.BatchResults {
+		require.ErrorIs(t, sent.Err(), context.DeadlineExceeded)
+		return stub
+	}).Once()
+	results := New(pool, collector).SendBatch(ctx, batch)
+	require.ErrorIs(t, results.Close(), context.DeadlineExceeded)
+	require.ErrorIs(t, results.Close(), context.DeadlineExceeded)
+	require.Equal(t, 1, collector.calls)
+	require.Equal(t, 1, stub.closes)
+	require.ErrorIs(t, collector.err, context.DeadlineExceeded)
+}
+
+func TestBatchTimeoutCoversBlockingDispatch(t *testing.T) {
+	pool, collector := NewMockPool(t), &batchCollector{}
+	parent, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	ctx := pgcontext.With(parent, pgcontext.WithTimeout(20*time.Millisecond))
+	batch := &pgx.Batch{}
+	stub := &batchStub{closeErr: context.DeadlineExceeded}
+	pool.EXPECT().SendBatch(mock.Anything, batch).RunAndReturn(func(sent context.Context, _ *pgx.Batch) pgx.BatchResults {
+		<-sent.Done()
+		require.ErrorIs(t, sent.Err(), context.DeadlineExceeded)
+		require.NoError(t, parent.Err(), "the configured timeout must expire before the parent")
+		return stub
+	}).Once()
+	results := New(pool, collector).SendBatch(ctx, batch)
+	require.ErrorIs(t, results.Close(), context.DeadlineExceeded)
+	require.Equal(t, 1, collector.calls)
+	require.ErrorIs(t, collector.err, context.DeadlineExceeded)
+}
+
+func TestBatchCloseErrorCancelsTimeoutWithoutCancelingParent(t *testing.T) {
+	pool, collector := NewMockPool(t), &batchCollector{}
+	parent, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	ctx := pgcontext.With(parent, pgcontext.WithTimeout(time.Hour))
+	batch := &pgx.Batch{}
+	failure := errors.New("close failed")
+	stub := &batchStub{closeErr: failure}
+	var sentCtx context.Context
+	pool.EXPECT().SendBatch(mock.Anything, batch).RunAndReturn(func(sent context.Context, _ *pgx.Batch) pgx.BatchResults {
+		sentCtx = sent
+		return stub
+	}).Once()
+	results := New(pool, collector).SendBatch(ctx, batch)
+	require.NoError(t, sentCtx.Err())
+	require.ErrorIs(t, results.Close(), failure)
+	require.ErrorIs(t, sentCtx.Err(), context.Canceled)
+	require.NoError(t, parent.Err())
+	require.Equal(t, 1, collector.calls)
+	require.ErrorIs(t, collector.err, failure)
+}
