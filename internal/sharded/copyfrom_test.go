@@ -65,6 +65,7 @@ func TestCopyFromCouldNotPickShard(t *testing.T) {
 		require.Zero(t, copied)
 	})
 }
+
 func TestCopyFromShardOutOfRangePanics(t *testing.T) {
 	db := New([]Pool{NewMockPool(t)}, nil)
 	ctx := pgcontext.With(context.Background(), pgcontext.WithShardID(1))
