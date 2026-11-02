@@ -85,10 +85,10 @@ func (m DB) Query(ctx context.Context, query string, args ...interface{}) (pgx.R
 	}
 	rows, err := m.db.Query(ctx, query, args...)
 	if err != nil {
+		m.defaultMetricsCollector.TrackQueryMetrics(ctx, begin, err)
 		if !cancel.IsEmpty() {
 			cancel.Value()
 		}
-		m.defaultMetricsCollector.TrackQueryMetrics(ctx, begin, err)
 		return nil, err
 	}
 	return newDecoratedRows(ctx, rows, cancel, begin, m.defaultMetricsCollector), nil
