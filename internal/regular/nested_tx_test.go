@@ -3,11 +3,12 @@ package regular
 import (
 	"context"
 	"fmt"
+	"testing"
+
 	"github.com/godepo/elephant/internal/pkg/pgcontext"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/stretchr/testify/require"
-	"testing"
 )
 
 // Real PostgreSQL success and rollback paths are covered in regular_test.go.
@@ -80,7 +81,6 @@ func TestInstance_Transactional_NestedErrors(t *testing.T) {
 		var cause *pgconn.PgError
 		require.ErrorAs(t, err, &cause)
 		require.Same(t, rollbackErr, cause)
-		require.ErrorIs(t, err, rollbackErr)
 		require.Contains(t, err.Error(), "can't rollback nested transaction")
 	})
 	t.Run("should preserve a matched callback when rollback fails", func(t *testing.T) {
