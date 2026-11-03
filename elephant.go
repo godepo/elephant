@@ -82,6 +82,10 @@ func ShardingKeyFrom(ctx context.Context) (string, bool) {
 	return pgcontext.ShardingKeyFrom(ctx)
 }
 
+// WithTimeout sets the metrics wrapper deadline for Query, QueryRow, Exec, SendBatch, and CopyFrom.
+// The deadline stays active for Query until rows are closed or exhausted, for QueryRow until Scan returns,
+// and for SendBatch until results are closed. Zero and negative durations expire immediately.
+// An earlier parent deadline takes precedence. Blocking CopyFrom sources must observe ctx themselves.
 func WithTimeout(timeout time.Duration) pgcontext.OptionContext {
 	return pgcontext.WithTimeout(timeout)
 }
