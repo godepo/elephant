@@ -78,15 +78,18 @@ func (m DB) Begin(ctx context.Context) (pgx.Tx, error) {
 //	       rows, err := db.Query(ctx, "SELECT * FROM users WHERE age > $1", 18)
 func (m DB) Query(ctx context.Context, query string, args ...interface{}) (pgx.Rows, error) {
 	begin := time.Now()
-	rows, err := m.db.Query(ctx, query, args...)
-	if err != nil {
-		m.defaultMetricsCollector.TrackQueryMetrics(ctx, begin, err)
-		return nil, err
-	}
 	cancel := monads.EmptyOf[context.CancelFunc]()
 	if timeout, ok := pgcontext.QueryTimeoutFrom(ctx); ok {
 		cancelCtx, cancelFunc := context.WithTimeout(ctx, timeout)
 		ctx, cancel = cancelCtx, monads.OptionalOf(cancelFunc)
+	}
+	rows, err := m.db.Query(ctx, query, args...)
+	if err != nil {
+		m.defaultMetricsCollector.TrackQueryMetrics(ctx, begin, err)
+		if !cancel.IsEmpty() {
+			cancel.Value()
+		}
+		return nil, err
 	}
 	return newDecoratedRows(ctx, rows, cancel, begin, m.defaultMetricsCollector), nil
 }
@@ -101,15 +104,16 @@ func (m DB) QueryRow(ctx context.Context, query string, args ...interface{}) pgx
 	row := decoratedMetricRow{
 		ctx:       ctx,
 		begin:     time.Now(),
-		row:       m.db.QueryRow(ctx, query, args...),
 		collector: m.defaultMetricsCollector,
 	}
 	timeout, ok := pgcontext.QueryTimeoutFrom(ctx)
 	if ok {
 		cancelCtx, cancel := context.WithTimeout(ctx, timeout)
+		ctx = cancelCtx
 		row.ctx = cancelCtx
 		row.cancel = monads.OptionalOf(cancel)
 	}
+	row.row = m.db.QueryRow(ctx, query, args...)
 	return row
 }
 
@@ -121,6 +125,11 @@ func (m DB) QueryRow(ctx context.Context, query string, args ...interface{}) pgx
 //   - Returns affected row count via CommandTag
 func (m DB) Exec(ctx context.Context, query string, args ...interface{}) (pgconn.CommandTag, error) {
 	begin := time.Now()
+	if timeout, ok := pgcontext.QueryTimeoutFrom(ctx); ok {
+		cancelCtx, cancel := context.WithTimeout(ctx, timeout)
+		defer cancel()
+		ctx = cancelCtx
+	}
 	tag, err := m.db.Exec(ctx, query, args...)
 	if err != nil {
 		m.defaultMetricsCollector.TrackQueryMetrics(ctx, begin, err)
