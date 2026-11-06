@@ -313,6 +313,87 @@ func main() {
 
 ```
 
+### PGX Pool statistic collector for prometheus
+
+You can construct pool collector for prometheus and take metrics from specified pgx pool. 
+
+For single pg:
+
+```go
+collector := poolstats.New(
+    poolstats.WithInformerProvider(poolstats.InformerProviderFrom(singlePool)), 
+)
+    
+```
+
+For CQRS cluster: 
+
+```go
+collector := poolstats.New(
+	poolstats.WithLabelsNames("role", "node"),
+    poolstats.WithInformerProvider(
+		poolstats.InformerProviderFrom(leaderPool),
+		poolstats.WithLabels("leader", "0")
+    ),
+    poolstats.WithInformerProvider(
+        poolstats.InformerProviderFrom(followerPool0),
+        poolstats.WithLabels("follower", "0")
+    ),
+    poolstats.WithInformerProvider(
+        poolstats.InformerProviderFrom(followerPool1),
+        poolstats.WithLabels("follower", "1")
+    ),
+)
+```
+
+For sharded cluster with CQRS support: 
+```go
+collector := poolstats.New(
+	poolstats.WithLabelsNames("role", "shard", "node"),
+    poolstats.WithInformerProvider(
+		poolstats.InformerProviderFrom(shard0leaderPool),
+		poolstats.WithLabels("leader", "0", "0")
+    ),
+    poolstats.WithInformerProvider(
+        poolstats.InformerProviderFrom(shard0followerPool0),
+        poolstats.WithLabels("follower", "0", "0")
+    ),
+    poolstats.WithInformerProvider(
+        poolstats.InformerProviderFrom(shard0followerPool1),
+        poolstats.WithLabels("follower", "0", "1")
+    ),
+    poolstats.WithLabels("role", "shard", "node"),
+        poolstats.WithInformerProvider(
+        poolstats.InformerProviderFrom(shard1leaderPool),
+        poolstats.WithLabels("leader", "1", "0")
+    ),
+    poolstats.WithInformerProvider(
+        poolstats.InformerProviderFrom(shard1followerPool0),
+        poolstats.WithLabels("follower", "1", "0")
+    ),
+)
+```
+
+And register this collector at prometheus registrer:
+
+```go
+reg := prometheus.NewRegistry()
+if reg.Register(collector) {
+    log.Fatal(err)
+}
+```
+
+#### Constant labels
+
+If you want register metrics with constants labels for all registred pools, you can using option for constructor:
+
+```go
+collector := poolstats.New(
+	poolstats.WithLabels(prometheus.Labels{"db": "pg"}),
+    poolstats.WithInformerProvider(poolstats.InformerProviderFrom(singlePool)), 
+)
+```
+
 ### Metrics and timeouts wrapper
 
 Construct regular node and add create collector for it. By example: use prometheus like there:
