@@ -43,6 +43,12 @@ linters:
         text: seems to be unused, consider removing or renaming it as _
       - path: (.+)\.go$
         text: assignments should only be cuddled with other assignments
+      - path: poolstats/describers.go
+        linters:
+          - lll
+      - path: poolstats/poolstats.go
+        linters:
+          - interfacebloat
     paths:
       - third_party$
       - builtin$
