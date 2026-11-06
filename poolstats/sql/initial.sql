@@ -1,0 +1,4 @@
+CREATE TABLE IF NOT EXISTS key_value(
+    id SERIAL PRIMARY KEY,
+    value TEXT
+)

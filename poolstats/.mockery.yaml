@@ -1,0 +1,12 @@
+filename: "mock_{{.InterfaceName}}_test.go"
+dir: ./
+structname: Mock{{.InterfaceName}}
+pkgname: poolstats
+template: testify
+force-file-write: true
+packages:
+  github.com/godepo/elephant/poolstats:
+    config:
+      all: false
+    interfaces:
+      Informer: {}
