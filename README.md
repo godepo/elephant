@@ -94,6 +94,172 @@ func (srv *Service) Greeting(ctx context.Context) (result string, err error) {
 }
 ```
 
+### Main application layer
+
+There we are connect to single postgres node and inject it to repository constructor.  
+
+```go
+func main() {
+	url := os.Getenv("DATABASE_URL")
+    db, err := trunk.New(
+        ctx,
+        trunk.WithNode(url),
+    )
+	if err != nil {
+		log.Fatal(err)
+    }
+	
+	defer db.Close()
+
+	srv := greetSrv.New(db, greetRepo.New(db))
+
+    greeting, err := srv.Greeting(context.Background())
+    if err != nil {
+        _, _ = fmt.Fprintf(os.Stderr, "Unable to greeing: %v\n", err)
+        os.Exit(1)
+    }
+
+    fmt.Println(greeting)
+}
+```
+
+### Query and pool statistics metrics
+
+Elephant present support prometheus exporter by functional option `trunk.WithMetrics`:
+
+```go
+    url := os.Getenv("DATABASE_URL")
+    reg := prometheus.NewRegistry()
+	
+    db, err := trunk.New(
+        ctx,
+        trunk.WithNode(url),
+		trunk.WithMetrics(reg),
+    )
+	if err != nil {
+		log.Fatal(err)
+    }
+	
+	defer db.Close()
+```
+
+### Connecting to HA Postgres Installation
+
+When we have HA Postgres cluster (like patroni). We can separate read-only queries and write-operations. 
+
+Before we construct HA Cluster like this:
+```go
+    urlLeader := os.Getenv("DATABASE_URL_LEADER")
+	urlFollower0 = os.Getenv("DATABASE_URL_FOLLOWER_0")
+    urlFollower1 = os.Getenv("DATABASE_URL_FOLLOWER_1")
+	
+    reg := prometheus.NewRegistry()
+	
+    db, err := trunk.New(
+        ctx,
+        trunk.WithNode(urlLeader, urlFollower0, urlFollower1),
+		trunk.WithMetrics(reg),
+    )
+	if err != nil {
+		log.Fatal(err)
+    }
+	
+	defer db.Close()
+```
+
+Now when we use in service layer annotation `elephant.WithCanWrite` all queries pass to leader node. 
+All other to followers by round robin. For example:
+
+```go
+writeCtx := elephant.With(reqCtx, elephant.WithCanWrite)
+txErr := srv.db.Transactional(writeCtx, func(ctx context.Context) error {
+    // there all queries routing to leader node, while we are specified annotation
+    err := accountRepo.Create(account)
+	if err != nil {
+		return err
+	}   
+}
+
+if txErr != nil {
+	return 0, txErr
+}
+
+// there using context without CanWrite annotation and query route to one follower 
+cnt, err := srv.accountRepo.CountTotal(reqCtx)
+
+if err != nil {
+	return 0, err
+}
+
+return cnt, nil
+```
+
+
+### Connecting to clustered postgresql installation
+
+When installation of postgres is sharding, elephant can access to it too. For example:
+
+```go
+urlLeader0 := os.Getenv("DATABASE_URL_LEADER_0")
+urlLeader1 := os.Getenv("DATABASE_URL_LEADER_1")
+urlLeader2 := os.Getenv("DATABASE_URL_LEADER_2")
+numShards := 3
+reg := prometheus.NewRegistry()
+
+db, err := trunk.New(
+    ctx,
+    trunk.WithNode(urlLeader0),
+    trunk.WithNode(urlLeader1),
+    trunk.WithNode(urlLeader2),
+    trunk.WithMetrics(reg),
+    trunk.WithPicker(func(ctx context.Context, key string) uint {
+        checksum := crc32.ChecksumIEEE([]byte(key))
+        return checksum % numShards
+    }),
+)
+if err != nil {
+    log.Fatal(err)
+}
+
+defer db.Close()
+```
+
+Now we have simple sharding function as picker. And 3 node sharded cluster. For specify sharding key use annotation 
+`elephant.WithShardingKey`. For example:
+
+```go
+writeCtx := elephant.With(reqCtx, elephant.WithShardingKey(req.UserID))
+txErr := srv.db.Transactional(writeCtx, func(ctx context.Context) error {
+    // there queries routing to shard containing user
+    err := accountRepo.Create(account)
+	if err != nil {
+		return err
+	}   
+}
+
+if txErr != nil {
+	return 0, txErr
+}
+```
+
+When we write workers (ex: transactional outbox worker), we can use annotation `elephant.WithShardID` for select target 
+shard:
+
+```go
+
+for _, shardID := range shardsNum {
+    wrkGrp.Go(accountOutboxWorkers.Run(elephant.With(ctx, elephant.WithShardID(shardId))))
+}
+
+```
+
+When worker call db or repository, all queries route to shardID. 
+
+## Low level api
+
+There presented low level construction API. Its present building specific platform connections by your needs. 
+Information there help you understanding components of elephant library.
+
 ### Construct connection
 
 There support multiple version of postgresql installations.

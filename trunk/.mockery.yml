@@ -1,0 +1,17 @@
+dir: ./
+structname: Mock{{.InterfaceName}}
+pkgname: trunk
+template: testify
+filename: mocks_{{.InterfaceName}}_test.go
+force-file-write: true
+packages:
+  github.com/godepo/elephant:
+    config:
+      all: false
+    interfaces:
+      MetricsBuilder: {}
+  github.com/prometheus/client_golang/prometheus:
+    config:
+      all: false
+    interfaces:
+      Registerer: {}
